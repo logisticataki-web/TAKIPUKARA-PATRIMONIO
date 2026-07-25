@@ -1,0 +1,509 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAKIPUKARA SAC - Panel de Gestión</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --amarillo: #FFC107;
+            --amarillo-oscuro: #E0A800;
+            --negro: #1E1E1E;
+            --gris-claro: #F5F5F5;
+            --blanco: #FFFFFF;
+            --rojo: #DC3545;
+            --borde: #DDDDDD;
+            --radio: 8px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
+        body { background:var(--gris-claro); color:var(--negro); display:flex; min-height:100vh; }
+        .sidebar {
+            width:250px; background:var(--negro); color:white; display:flex; flex-direction:column;
+            padding:2rem 1rem; gap:2rem;
+        }
+        .logo-container { text-align:center; border-bottom:2px solid var(--amarillo); padding-bottom:1rem; }
+        .logo-container img { width:120px; height:auto; margin-bottom:0.5rem; }
+        .logo-container .empresa-nombre { font-weight:bold; font-size:1.2rem; color:var(--amarillo); }
+        .sidebar nav { display:flex; flex-direction:column; gap:0.5rem; }
+        .sidebar nav button {
+            background:transparent; border:none; color:#ccc; padding:0.8rem 1rem;
+            text-align:left; font-size:1rem; border-radius:var(--radio); cursor:pointer;
+            transition:0.2s; font-weight:500;
+        }
+        .sidebar nav button:hover, .sidebar nav button.active { background:var(--amarillo); color:var(--negro); font-weight:bold; }
+        .main { flex:1; display:flex; flex-direction:column; }
+        .topbar {
+            background:white; padding:1rem 2rem; box-shadow:0 2px 8px rgba(0,0,0,0.1);
+            display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid var(--amarillo);
+        }
+        .content { padding:2rem; flex:1; }
+        .card { background:white; border-radius:var(--radio); box-shadow:0 2px 12px rgba(0,0,0,0.08); padding:1.5rem; }
+        .table-wrapper { overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; margin-top:1rem; min-width:800px; }
+        th { background:var(--negro); color:var(--amarillo); padding:12px 10px; font-weight:600; text-align:left; font-size:0.9rem; }
+        td { padding:10px; border-bottom:1px solid var(--borde); font-size:0.9rem; }
+        tr:hover td { background:#FFF8E1; }
+        .btn { padding:0.5rem 1rem; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.9rem; }
+        .btn-amarillo { background:var(--amarillo); color:var(--negro); }
+        .btn-amarillo:hover { background:var(--amarillo-oscuro); }
+        .btn-outline { background:white; border:1px solid var(--negro); color:var(--negro); }
+        .btn-outline:hover { background:#f0f0f0; }
+        .btn-danger { background:var(--rojo); color:white; }
+        .btn-sm { padding:0.3rem 0.7rem; font-size:0.8rem; }
+        .badge { display:inline-block; padding:0.3rem 0.8rem; border-radius:20px; font-size:0.8rem; font-weight:600; }
+        .badge-activo { background:#D4EDDA; color:#155724; }
+        .badge-devuelto { background:#F8D7DA; color:#721C24; }
+        .hidden { display:none; }
+        .modal {
+            display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;
+        }
+        .modal-content {
+            background:white; padding:2rem; border-radius:12px; width:90%; max-width:500px;
+            max-height:90vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 { margin-bottom:1rem; color:var(--negro); border-bottom:2px solid var(--amarillo); padding-bottom:0.5rem; }
+        .form-group { margin-bottom:1rem; }
+        .form-group label { display:block; font-weight:600; margin-bottom:0.3rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width:100%; padding:0.6rem; border:1px solid var(--borde); border-radius:6px; font-size:1rem;
+        }
+        .flex-end { display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem; }
+        .btn-config { background:transparent; border:1px dashed var(--amarillo); color:var(--amarillo); padding:0.3rem 0.6rem; font-size:0.8rem; }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="logo-container">
+        <img src="logo.png" alt="Logo TAKIPUKARA" style="width:120px;">
+        <div class="empresa-nombre">TAKIPUKARA SAC</div>
+    </div>
+    <nav>
+        <button class="nav-btn active" data-view="asignaciones">🏷️ Asignaciones</button>
+        <button class="nav-btn" data-view="productos">📦 Productos</button>
+        <button class="nav-btn" data-view="usuarios">👥 Usuarios</button>
+        <button class="btn-config" id="btn-config-encargados">⚙️ Encargados</button>
+    </nav>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <h2 id="view-title">Asignaciones</h2>
+        <div>
+            <button class="btn" style="background:var(--negro); color:var(--amarillo); border:2px solid var(--amarillo);" id="btn-exportar">📊 Exportar a Excel</button>
+            <span style="color:#666; margin-left:2rem;" id="reloj"></span>
+        </div>
+    </div>
+    <div class="content">
+        <!-- Vista Asignaciones -->
+        <div id="view-asignaciones" class="view">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <input type="text" id="search-asignaciones" placeholder="Buscar..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    <button class="btn btn-amarillo" id="btn-nueva-asignacion">+ Nueva Asignación</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="tabla-asignaciones">
+                        <thead><tr><th>ID</th><th>Producto</th><th>Usuario</th><th>Fecha</th><th>Estado</th><th>Encargado</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Vista Productos -->
+        <div id="view-productos" class="view hidden">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <input type="text" id="search-productos" placeholder="Buscar producto..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    <button class="btn btn-amarillo" id="btn-nuevo-producto">+ Nuevo Producto</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="tabla-productos">
+                        <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Modelo</th><th>Nº Serie</th><th>IMEI</th><th>Color</th><th>Condición</th><th>Accesorios</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Vista Usuarios -->
+        <div id="view-usuarios" class="view hidden">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <input type="text" id="search-usuarios" placeholder="Buscar usuario..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="tabla-usuarios">
+                        <thead><tr><th>Nombre</th><th>DNI</th><th>Área</th><th>Cargo</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modal"><div class="modal-content" id="modal-body"></div></div>
+
+<script>
+    // ========= CONFIGURACIÓN =========
+    const BIN_ID = '6a63ec30f5f4af5e29bda3ba'
+    const API_KEY = '$2a$10$B1kWSjwjy6k5vMdg7Amm0OhrhypX3K1EP6ET0eJHtG/EssxCCYIXW'
+    const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+    let data = {
+        productos: [],
+        usuarios: [],
+        asignaciones: [],
+        nextIdAsignacion: 1,
+        encargados: ["Juan Pérez", "María López", "Carlos Ruiz", "Ana Torres"]
+    };
+
+    async function cargarDatos() {
+        try {
+            const res = await fetch(BASE_URL, { headers: { 'X-Master-Key': API_KEY } });
+            if (res.ok) {
+                const json = await res.json();
+                data = json.record;
+                if (!data.encargados) data.encargados = ["Juan Pérez", "María López", "Carlos Ruiz", "Ana Torres"];
+            }
+        } catch (e) { console.error(e); }
+        renderizar();
+    }
+
+    async function guardar() {
+        try {
+            await fetch(BASE_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                body: JSON.stringify(data)
+            });
+        } catch (e) { alert('Error al guardar en la nube'); }
+    }
+
+    // ---- RELOJ ----
+    function reloj() { document.getElementById('reloj').textContent = new Date().toLocaleString('es-PE'); }
+    setInterval(reloj, 1000); reloj();
+
+    // ---- NAVEGACIÓN ----
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const views = document.querySelectorAll('.view');
+    const viewTitle = document.getElementById('view-title');
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            navBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const vista = btn.dataset.view;
+            views.forEach(v => v.classList.add('hidden'));
+            document.getElementById('view-' + vista).classList.remove('hidden');
+            viewTitle.textContent = vista === 'asignaciones' ? 'Asignaciones' : (vista === 'productos' ? 'Productos' : 'Usuarios');
+            renderizar();
+        });
+    });
+
+    // ---- CONFIGURAR ENCARGADOS ----
+    document.getElementById('btn-config-encargados').addEventListener('click', () => {
+        const html = `<div class="form-group"><label>Nombres de encargados (separados por coma)</label>
+            <textarea id="txt-encargados" rows="4">${data.encargados.join(', ')}</textarea></div>`;
+        abrirModal('Configurar Encargados', html, () => {
+            const raw = document.getElementById('txt-encargados').value;
+            data.encargados = raw.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
+            guardar().then(renderizar);
+        });
+    });
+
+    // ---- FUNCIONES AUXILIARES ----
+    function obtenerProducto(codigo) { return data.productos.find(p => p.codigo === codigo); }
+    function productoDisponible(codigo) {
+        return !data.asignaciones.some(a => a.codigoProducto === codigo && a.estado === 'Activo');
+    }
+
+    // ---- RENDERIZADO ----
+    function renderizarAsignaciones(filtro = '') {
+        const tbody = document.querySelector('#tabla-asignaciones tbody');
+        let lista = data.asignaciones;
+        if (filtro) {
+            const f = filtro.toLowerCase();
+            lista = lista.filter(a => {
+                const prod = obtenerProducto(a.codigoProducto);
+                const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
+                return (prod?.descripcion?.toLowerCase().includes(f) || prod?.codigo?.toLowerCase().includes(f) || usr?.nombre?.toLowerCase().includes(f));
+            });
+        }
+        tbody.innerHTML = lista.map(a => {
+            const prod = obtenerProducto(a.codigoProducto);
+            const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
+            const estadoClase = a.estado === 'Activo' ? 'badge-activo' : 'badge-devuelto';
+            return `<tr>
+                <td>${a.id}</td>
+                <td>${prod ? prod.codigo + ' - ' + prod.descripcion : '???'}</td>
+                <td>${usr ? usr.nombre : '???'}</td>
+                <td>${a.fecha}</td>
+                <td><span class="badge ${estadoClase}">${a.estado}</span></td>
+                <td>${a.encargado}</td>
+                <td>
+                    ${a.estado === 'Activo' ? `<button class="btn btn-outline btn-sm btn-qr" data-id="${a.id}">QR</button>
+                     <button class="btn btn-outline btn-sm btn-devolver" data-id="${a.id}">Devolver</button>` :
+                     `<button class="btn btn-outline btn-sm btn-reasignar" data-id="${a.id}">Reasignar</button>`}
+                    <button class="btn btn-danger btn-sm btn-eliminar-asig" data-id="${a.id}">Eliminar</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderizarProductos(filtro = '') {
+        const tbody = document.querySelector('#tabla-productos tbody');
+        let lista = data.productos;
+        if (filtro) {
+            const f = filtro.toLowerCase();
+            lista = lista.filter(p => p.codigo.toLowerCase().includes(f) || p.descripcion.toLowerCase().includes(f) || p.marca.toLowerCase().includes(f));
+        }
+        tbody.innerHTML = lista.map(p => `<tr>
+            <td>${p.codigo}</td><td>${p.descripcion}</td><td>${p.marca}</td><td>${p.modelo}</td>
+            <td>${p.numeroSerie}</td><td>${p.imei || '-'}</td><td>${p.color || '-'}</td><td>${p.condicion}</td>
+            <td>${p.accesorios || '-'}</td>
+            <td><button class="btn btn-outline btn-sm btn-editar-prod" data-codigo="${p.codigo}">Editar</button>
+                <button class="btn btn-danger btn-sm btn-eliminar-prod" data-codigo="${p.codigo}">Eliminar</button></td>
+        </tr>`).join('');
+    }
+
+    function renderizarUsuarios(filtro = '') {
+        const tbody = document.querySelector('#tabla-usuarios tbody');
+        let lista = data.usuarios;
+        if (filtro) {
+            const f = filtro.toLowerCase();
+            lista = lista.filter(u => u.nombre.toLowerCase().includes(f) || u.dni.includes(f));
+        }
+        tbody.innerHTML = lista.map(u => `<tr>
+            <td>${u.nombre}</td><td>${u.dni}</td><td>${u.area}</td><td>${u.cargo}</td>
+            <td><button class="btn btn-outline btn-sm btn-editar-usr" data-dni="${u.dni}">Editar</button>
+                <button class="btn btn-danger btn-sm btn-eliminar-usr" data-dni="${u.dni}">Eliminar</button></td>
+        </tr>`).join('');
+    }
+
+    function renderizar() {
+        const vistaActiva = document.querySelector('.view:not(.hidden)').id;
+        if (vistaActiva === 'view-asignaciones') renderizarAsignaciones(document.getElementById('search-asignaciones')?.value || '');
+        else if (vistaActiva === 'view-productos') renderizarProductos(document.getElementById('search-productos')?.value || '');
+        else if (vistaActiva === 'view-usuarios') renderizarUsuarios(document.getElementById('search-usuarios')?.value || '');
+    }
+
+    // ---- EXPORTAR EXCEL ----
+    function exportarCSV() {
+        const encabezados = ['ID','Código Producto','Descripción','Marca','Modelo','Nº Serie','IMEI','Color','Condición','Accesorios','Usuario','DNI','Área','Cargo','Fecha','Estado','Encargado'];
+        const filas = [encabezados];
+        data.asignaciones.forEach(a => {
+            const prod = obtenerProducto(a.codigoProducto);
+            const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
+            filas.push([a.id, prod?.codigo||'', prod?.descripcion||'', prod?.marca||'', prod?.modelo||'', prod?.numeroSerie||'', prod?.imei||'', prod?.color||'', prod?.condicion||'', prod?.accesorios||'', usr?.nombre||'', usr?.dni||'', usr?.area||'', usr?.cargo||'', a.fecha, a.estado, a.encargado]);
+        });
+        let csv = '\uFEFF' + filas.map(f => f.map(c => /[",\n\r]/.test(c) ? `"${c.replace(/"/g,'""')}"` : c).join(',')).join('\n');
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'informe_takipukara_' + new Date().toISOString().slice(0,10) + '.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    document.getElementById('btn-exportar').addEventListener('click', exportarCSV);
+
+    // ---- MODAL GENÉRICO ----
+    function abrirModal(titulo, html, onGuardar) {
+        const modal = document.getElementById('modal');
+        const body = document.getElementById('modal-body');
+        body.innerHTML = `<h3>${titulo}</h3>${html}<div class="flex-end"><button class="btn btn-outline" id="btn-cancelar">Cancelar</button><button class="btn btn-amarillo" id="btn-guardar">Guardar</button></div>`;
+        modal.style.display = 'flex';
+        document.getElementById('btn-cancelar').onclick = () => modal.style.display = 'none';
+        document.getElementById('btn-guardar').onclick = () => { onGuardar(); modal.style.display = 'none'; renderizar(); };
+        modal.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+    }
+    function obtenerValor(id) { return document.getElementById(id).value.trim(); }
+
+    // ---- NUEVO PRODUCTO ----
+    document.getElementById('btn-nuevo-producto').addEventListener('click', () => {
+        const html = `
+            <div class="form-group"><label>Código de empresa *</label><input type="text" id="prod-codigo" required></div>
+            <div class="form-group"><label>Descripción *</label><input type="text" id="prod-descripcion" required></div>
+            <div class="form-group"><label>Marca *</label><input type="text" id="prod-marca" required></div>
+            <div class="form-group"><label>Modelo *</label><input type="text" id="prod-modelo" required></div>
+            <div class="form-group"><label>Nº de serie *</label><input type="text" id="prod-serie" required></div>
+            <div class="form-group"><label>IMEI (opcional)</label><input type="text" id="prod-imei"></div>
+            <div class="form-group"><label>Color</label><input type="text" id="prod-color"></div>
+            <div class="form-group"><label>Condición</label><select id="prod-condicion"><option>Nuevo</option><option>Usado</option><option>Reparado</option><option>Reacondicionado</option></select></div>
+            <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios" rows="2"></textarea></div>
+        `;
+        abrirModal('Nuevo Producto', html, () => {
+            const codigo = obtenerValor('prod-codigo');
+            if (data.productos.some(p => p.codigo === codigo)) { alert('Código ya existe.'); return; }
+            data.productos.push({
+                codigo, descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
+                modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
+                imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
+                condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios')
+            });
+            guardar();
+        });
+    });
+
+    // ---- EVENTOS DELEGADOS (editar/eliminar usuarios, productos, asignaciones, QR, etc.) ----
+    document.addEventListener('click', e => {
+        // Editar producto
+        if (e.target.classList.contains('btn-editar-prod')) {
+            const prod = data.productos.find(p => p.codigo === e.target.dataset.codigo);
+            if (!prod) return;
+            const html = `
+                <input type="hidden" id="prod-codigo" value="${prod.codigo}">
+                <div class="form-group"><label>Descripción</label><input type="text" id="prod-descripcion" value="${prod.descripcion}"></div>
+                <div class="form-group"><label>Marca</label><input type="text" id="prod-marca" value="${prod.marca}"></div>
+                <div class="form-group"><label>Modelo</label><input type="text" id="prod-modelo" value="${prod.modelo}"></div>
+                <div class="form-group"><label>Nº de serie</label><input type="text" id="prod-serie" value="${prod.numeroSerie}"></div>
+                <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei" value="${prod.imei||''}"></div>
+                <div class="form-group"><label>Color</label><input type="text" id="prod-color" value="${prod.color||''}"></div>
+                <div class="form-group"><label>Condición</label><select id="prod-condicion">${['Nuevo','Usado','Reparado','Reacondicionado'].map(o => `<option ${prod.condicion===o?'selected':''}>${o}</option>`).join('')}</select></div>
+                <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios||''}</textarea></div>
+            `;
+            abrirModal('Editar Producto', html, () => {
+                prod.descripcion = obtenerValor('prod-descripcion'); prod.marca = obtenerValor('prod-marca');
+                prod.modelo = obtenerValor('prod-modelo'); prod.numeroSerie = obtenerValor('prod-serie');
+                prod.imei = obtenerValor('prod-imei'); prod.color = obtenerValor('prod-color');
+                prod.condicion = obtenerValor('prod-condicion'); prod.accesorios = obtenerValor('prod-accesorios');
+                guardar();
+            });
+        }
+        // Eliminar producto
+        if (e.target.classList.contains('btn-eliminar-prod')) {
+            if (confirm('¿Eliminar producto y sus asignaciones?')) {
+                data.productos = data.productos.filter(p => p.codigo !== e.target.dataset.codigo);
+                data.asignaciones = data.asignaciones.filter(a => a.codigoProducto !== e.target.dataset.codigo);
+                guardar().then(renderizar);
+            }
+        }
+        // Nuevo usuario
+        if (e.target.id === 'btn-nuevo-usuario') {
+            const html = `
+                <div class="form-group"><label>Nombre completo *</label><input type="text" id="usr-nombre"></div>
+                <div class="form-group"><label>DNI *</label><input type="text" id="usr-dni"></div>
+                <div class="form-group"><label>Área *</label><input type="text" id="usr-area"></div>
+                <div class="form-group"><label>Cargo *</label><input type="text" id="usr-cargo"></div>
+            `;
+            abrirModal('Nuevo Usuario', html, () => {
+                const dni = obtenerValor('usr-dni');
+                if (data.usuarios.some(u => u.dni === dni)) { alert('DNI ya existe'); return; }
+                data.usuarios.push({ nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') });
+                guardar();
+            });
+        }
+        // Editar usuario
+        if (e.target.classList.contains('btn-editar-usr')) {
+            const usr = data.usuarios.find(u => u.dni === e.target.dataset.dni);
+            if (!usr) return;
+            const html = `
+                <input type="hidden" id="usr-dni" value="${usr.dni}">
+                <div class="form-group"><label>Nombre</label><input type="text" id="usr-nombre" value="${usr.nombre}"></div>
+                <div class="form-group"><label>Área</label><input type="text" id="usr-area" value="${usr.area}"></div>
+                <div class="form-group"><label>Cargo</label><input type="text" id="usr-cargo" value="${usr.cargo}"></div>
+            `;
+            abrirModal('Editar Usuario', html, () => {
+                usr.nombre = obtenerValor('usr-nombre'); usr.area = obtenerValor('usr-area'); usr.cargo = obtenerValor('usr-cargo');
+                guardar();
+            });
+        }
+        // Eliminar usuario
+        if (e.target.classList.contains('btn-eliminar-usr')) {
+            if (confirm('¿Eliminar usuario y sus asignaciones?')) {
+                data.usuarios = data.usuarios.filter(u => u.dni !== e.target.dataset.dni);
+                data.asignaciones = data.asignaciones.filter(a => a.dniUsuario !== e.target.dataset.dni);
+                guardar().then(renderizar);
+            }
+        }
+        // Nueva asignación
+        if (e.target.id === 'btn-nueva-asignacion') {
+            const disponibles = data.productos.filter(p => productoDisponible(p.codigo));
+            if (!disponibles.length) { alert('No hay productos disponibles.'); return; }
+            const opcionesProd = disponibles.map(p => `<option value="${p.codigo}">${p.codigo} - ${p.descripcion}</option>`).join('');
+            const opcionesUsr = data.usuarios.map(u => `<option value="${u.dni}">${u.nombre}</option>`).join('');
+            const opcionesEnc = data.encargados.map(n => `<option>${n}</option>`).join('');
+            const html = `
+                <div class="form-group"><label>Producto</label><select id="asig-producto">${opcionesProd}</select></div>
+                <div class="form-group"><label>Usuario</label><select id="asig-usuario">${opcionesUsr}</select></div>
+                <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div class="form-group"><label>Encargado</label><select id="asig-encargado">${opcionesEnc}</select></div>
+            `;
+            abrirModal('Nueva Asignación', html, () => {
+                data.asignaciones.push({
+                    id: data.nextIdAsignacion++,
+                    codigoProducto: obtenerValor('asig-producto'),
+                    dniUsuario: obtenerValor('asig-usuario'),
+                    fecha: obtenerValor('asig-fecha'),
+                    encargado: obtenerValor('asig-encargado'),
+                    estado: 'Activo'
+                });
+                guardar();
+            });
+        }
+        // Botón QR
+        if (e.target.classList.contains('btn-qr')) {
+            const idAsig = parseInt(e.target.dataset.id);
+            const url = `${window.location.origin}${window.location.pathname.replace('dashboard.html','')}ver.html?id=${idAsig}`;
+            const modal = document.getElementById('modal');
+            const body = document.getElementById('modal-body');
+            body.innerHTML = `<h3>QR Asignación #${idAsig}</h3><div class="qr-container" id="qrcode"></div>
+                <p style="text-align:center; margin-top:1rem;"><a href="${url}" target="_blank">${url}</a></p>
+                <div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
+                <button class="btn btn-amarillo" id="btn-imprimir">Imprimir</button></div>`;
+            modal.style.display = 'flex';
+            const qrDiv = document.getElementById('qrcode'); qrDiv.innerHTML = '';
+            new QRCode(qrDiv, { text: url, width:220, height:220, colorDark:"#1E1E1E", colorLight:"#FFFFFF", correctLevel:QRCode.CorrectLevel.H });
+            document.getElementById('btn-imprimir').onclick = () => {
+                const win = window.open('','_blank');
+                win.document.write(`<html><head><title>QR</title></head><body style="text-align:center"><h2>TAKIPUKARA SAC</h2><img src="${qrDiv.querySelector('img').src}" style="width:250px"><p>${url}</p><script>window.print();<\/script></body></html>`);
+                win.document.close();
+            };
+        }
+        // Devolver
+        if (e.target.classList.contains('btn-devolver')) {
+            const asig = data.asignaciones.find(a => a.id == e.target.dataset.id);
+            if (asig && confirm('¿Marcar como devuelto?')) { asig.estado = 'Devuelto'; guardar().then(renderizar); }
+        }
+        // Reasignar
+        if (e.target.classList.contains('btn-reasignar')) {
+            const original = data.asignaciones.find(a => a.id == e.target.dataset.id);
+            if (!original || original.estado !== 'Devuelto') return;
+            if (!productoDisponible(original.codigoProducto)) { alert('Producto ya asignado.'); return; }
+            const opcionesUsr = data.usuarios.map(u => `<option value="${u.dni}">${u.nombre}</option>`).join('');
+            const opcionesEnc = data.encargados.map(n => `<option>${n}</option>`).join('');
+            const html = `<p>Producto: ${original.codigoProducto}</p>
+                <div class="form-group"><label>Nuevo Usuario</label><select id="reasig-usuario">${opcionesUsr}</select></div>
+                <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>`;
+            abrirModal('Reasignar Producto', html, () => {
+                data.asignaciones.push({
+                    id: data.nextIdAsignacion++,
+                    codigoProducto: original.codigoProducto,
+                    dniUsuario: obtenerValor('reasig-usuario'),
+                    fecha: obtenerValor('reasig-fecha'),
+                    encargado: obtenerValor('reasig-encargado'),
+                    estado: 'Activo'
+                });
+                guardar();
+            });
+        }
+        // Eliminar asignación
+        if (e.target.classList.contains('btn-eliminar-asig')) {
+            if (confirm('¿Eliminar asignación?')) {
+                data.asignaciones = data.asignaciones.filter(a => a.id != e.target.dataset.id);
+                guardar().then(renderizar);
+            }
+        }
+    });
+
+    // Búsquedas en tiempo real
+    ['search-asignaciones','search-productos','search-usuarios'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', renderizar);
+    });
+
+    // Cargar datos al iniciar
+    cargarDatos();
+</script>
+</body>
+</html>
