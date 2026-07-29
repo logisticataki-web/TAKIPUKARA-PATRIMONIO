@@ -172,7 +172,7 @@
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-productos">
-                        <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Modelo</th><th>Nº Serie</th><th>IMEI</th><th>Color</th><th>Condición</th><th>Accesorios</th><th>Acciones</th></tr></thead>
+                        <thead><tr><th>Código</th><th>Categoría</th><th>Descripción</th><th>Marca</th><th>Modelo</th><th>Nº Serie</th><th>IMEI</th><th>Color</th><th>Condición</th><th>Accesorios</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -183,7 +183,12 @@
             <div class="card">
                 <div class="toolbar">
                     <input type="text" id="search-usuarios" placeholder="Buscar usuario...">
-                    <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
+                    <div class="toolbar-actions">
+                        <button class="btn btn-outline btn-sm" id="btn-plantilla-usr">📄 Plantilla</button>
+                        <button class="btn btn-outline btn-sm" id="btn-importar-usr">📥 Importar Excel</button>
+                        <input type="file" id="input-importar-usr" accept=".xlsx,.xls,.csv" style="display:none;">
+                        <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
+                    </div>
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-usuarios">
@@ -232,10 +237,20 @@
 
     // ---- MAPEO fila de Supabase <-> objeto usado por la interfaz ----
     function productoDesdeFila(p) {
-        return { codigo: p.codigo, descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios };
+        return { codigo: p.codigo, categoria: p.categoria || '', descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios };
     }
     function asignacionDesdeFila(a) {
-        return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado };
+        return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado, urlVale: a.url_vale, urlFoto: a.url_foto };
+    }
+    // ---- EVIDENCIA (subida de archivos a Supabase Storage) ----
+    async function subirEvidencia(file, prefijo) {
+        if (!file) return null;
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        const ruta = `${prefijo}_${Date.now()}.${ext}`;
+        const { error } = await sb.storage.from('evidencias').upload(ruta, file, { upsert: true });
+        if (error) { alert('Error al subir archivo (' + prefijo + '): ' + error.message); return null; }
+        const { data: pub } = sb.storage.from('evidencias').getPublicUrl(ruta);
+        return pub.publicUrl;
     }
 
     async function cargarDatos() {
@@ -423,6 +438,7 @@
                     ${a.estado === 'Activo' ? `<button class="btn btn-outline btn-sm btn-qr" data-codigo="${a.codigoProducto}">QR</button>
                      <button class="btn btn-outline btn-sm btn-devolver" data-id="${a.id}">Devolver</button>` :
                      `<button class="btn btn-outline btn-sm btn-reasignar" data-id="${a.id}">Reasignar</button>`}
+                    <button class="btn btn-outline btn-sm btn-evidencia" data-id="${a.id}">📎${(a.urlVale || a.urlFoto) ? ' ✓' : ''}</button>
                     <button class="btn btn-danger btn-sm btn-eliminar-asig" data-id="${a.id}">Eliminar</button>
                 </td>
             </tr>`;
@@ -434,10 +450,10 @@
         let lista = data.productos;
         if (filtro) {
             const f = filtro.toLowerCase();
-            lista = lista.filter(p => p.codigo.toLowerCase().includes(f) || p.descripcion.toLowerCase().includes(f) || p.marca.toLowerCase().includes(f));
+            lista = lista.filter(p => p.codigo.toLowerCase().includes(f) || p.descripcion.toLowerCase().includes(f) || p.marca.toLowerCase().includes(f) || (p.categoria || '').toLowerCase().includes(f));
         }
         tbody.innerHTML = lista.map(p => `<tr>
-            <td>${p.codigo}</td><td>${p.descripcion}</td><td>${p.marca}</td><td>${p.modelo}</td>
+            <td>${p.codigo}</td><td>${p.categoria || '-'}</td><td>${p.descripcion}</td><td>${p.marca}</td><td>${p.modelo}</td>
             <td>${p.numeroSerie}</td><td>${p.imei || '-'}</td><td>${p.color || '-'}</td><td>${p.condicion}</td>
             <td>${p.accesorios || '-'}</td>
             <td><button class="btn btn-outline btn-sm btn-qr-prod" data-codigo="${p.codigo}">QR</button>
@@ -500,7 +516,7 @@
 
     // ---- PLANTILLA E IMPORTAR PRODUCTOS DESDE EXCEL ----
     document.getElementById('btn-plantilla').addEventListener('click', () => {
-        const ejemplo = [{ 'Código': 'EJ-0001', 'Descripción': 'Laptop Dell Latitude', 'Marca': 'Dell', 'Modelo': 'Latitude 5420', 'Nº Serie': 'ABC123456', 'IMEI': '', 'Color': 'Gris', 'Condición': 'Nuevo', 'Accesorios': 'Cargador, mochila' }];
+        const ejemplo = [{ 'Código': 'EJ-0001', 'Categoría': 'EQUIPOS DE COMPUTO', 'Descripción': 'Laptop Dell Latitude', 'Marca': 'Dell', 'Modelo': 'Latitude 5420', 'Nº Serie': 'ABC123456', 'IMEI': '', 'Color': 'Gris', 'Condición': 'Nuevo', 'Accesorios': 'Cargador, mochila' }];
         const ws = XLSX.utils.json_to_sheet(ejemplo);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Productos');
@@ -521,20 +537,21 @@
             let sinCodigo = 0, yaEnPlanilla = 0;
             const vistos = new Set();
             filas.forEach(r => {
-                const codigo = val(r, 'Código', 'Codigo', 'código', 'codigo', 'CÓDIGO', 'CODIGO');
+                const codigo = val(r, 'Código', 'Codigo', 'código', 'codigo', 'CÓDIGO', 'CODIGO', 'CODIGO SKU', 'Código SKU', 'Codigo SKU', 'SKU');
                 if (!codigo) { sinCodigo++; return; }
                 if (data.productos.some(p => p.codigo === codigo) || vistos.has(codigo)) { yaEnPlanilla++; return; }
                 vistos.add(codigo);
                 nuevos.push({
                     codigo,
-                    descripcion: val(r, 'Descripción', 'Descripcion', 'descripción', 'descripcion'),
-                    marca: val(r, 'Marca', 'marca'),
-                    modelo: val(r, 'Modelo', 'modelo'),
-                    numero_serie: val(r, 'Nº Serie', 'N° Serie', 'Numero Serie', 'Número de Serie', 'Serie'),
+                    categoria: val(r, 'Categoría', 'Categoria', 'CATEGORIA', 'CATEGORÍA'),
+                    descripcion: val(r, 'Descripción', 'Descripcion', 'descripción', 'descripcion', 'DESCRIPCION', 'DESCRIPCION '),
+                    marca: val(r, 'Marca', 'marca', 'MARCA'),
+                    modelo: val(r, 'Modelo', 'modelo', 'MODELO'),
+                    numero_serie: val(r, 'Nº Serie', 'N° Serie', 'Numero Serie', 'Número de Serie', 'Serie', 'N° DE SERIE', 'NUMERO DE SERIE'),
                     imei: val(r, 'IMEI', 'imei'),
-                    color: val(r, 'Color', 'color'),
-                    condicion: val(r, 'Condición', 'Condicion', 'condición') || 'Nuevo',
-                    accesorios: val(r, 'Accesorios', 'accesorios')
+                    color: val(r, 'Color', 'color', 'COLOR'),
+                    condicion: val(r, 'Condición', 'Condicion', 'condición', 'CONDICION') || 'Nuevo',
+                    accesorios: val(r, 'Accesorios', 'accesorios', 'ACCESORIOS')
                 });
             });
             let agregados = 0;
@@ -548,6 +565,58 @@
             }
             renderizar();
             alert(`Importación completa.\nAgregados: ${agregados}\nYa existían / duplicados en el archivo: ${yaEnPlanilla}\nFilas sin código omitidas: ${sinCodigo}`);
+        } catch (err) {
+            alert('No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) válido y use la plantilla como referencia.');
+        }
+        e.target.value = '';
+    });
+
+    // ---- PLANTILLA E IMPORTAR USUARIOS DESDE EXCEL ----
+    document.getElementById('btn-plantilla-usr').addEventListener('click', () => {
+        const ejemplo = [{ 'DNI': '12345678', 'Nombre': 'Juan Pérez Quispe', 'Área': 'OPERACIONES', 'Cargo': 'Supervisor' }];
+        const ws = XLSX.utils.json_to_sheet(ejemplo);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Usuarios');
+        XLSX.writeFile(wb, 'plantilla_usuarios_takipukara.xlsx');
+    });
+
+    document.getElementById('btn-importar-usr').addEventListener('click', () => document.getElementById('input-importar-usr').click());
+    document.getElementById('input-importar-usr').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const val = (r, ...claves) => { for (const k of claves) { if (r[k] !== undefined && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
+            const nuevos = [];
+            let sinDni = 0, yaEnPlanilla = 0;
+            const vistos = new Set();
+            filas.forEach(r => {
+                let dni = val(r, 'DNI', 'Dni', 'dni');
+                if (!dni) { sinDni++; return; }
+                dni = dni.replace(/\.0$/, '');
+                if (data.usuarios.some(u => u.dni === dni) || vistos.has(dni)) { yaEnPlanilla++; return; }
+                vistos.add(dni);
+                nuevos.push({
+                    dni,
+                    nombre: val(r, 'Nombre', 'nombre', 'NOMBRE', 'A. PATERNO', 'A. PATERNO ', 'Nombres', 'NOMBRES', 'Nombre Completo'),
+                    area: val(r, 'Área', 'Area', 'AREA', 'área'),
+                    cargo: val(r, 'Cargo', 'cargo', 'Cargos', 'CARGOS', 'CARGO')
+                });
+            });
+            let agregados = 0;
+            if (nuevos.length > 0) {
+                const { data: insertados, error } = await sb.from('usuarios')
+                    .upsert(nuevos, { onConflict: 'dni', ignoreDuplicates: true })
+                    .select();
+                if (error) { alert('Error al importar: ' + error.message); return; }
+                agregados = insertados.length;
+                data.usuarios.push(...insertados.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo })));
+            }
+            renderizar();
+            alert(`Importación completa.\nAgregados: ${agregados}\nYa existían / duplicados en el archivo: ${yaEnPlanilla}\nFilas sin DNI omitidas: ${sinDni}`);
         } catch (err) {
             alert('No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) válido y use la plantilla como referencia.');
         }
@@ -570,6 +639,7 @@
     document.getElementById('btn-nuevo-producto').addEventListener('click', () => {
         const html = `
             <div class="form-group"><label>Código de empresa *</label><input type="text" id="prod-codigo" required></div>
+            <div class="form-group"><label>Categoría</label><input type="text" id="prod-categoria" placeholder="Ej: EQUIPOS DE COMPUTO"></div>
             <div class="form-group"><label>Descripción *</label><input type="text" id="prod-descripcion" required></div>
             <div class="form-group"><label>Marca *</label><input type="text" id="prod-marca" required></div>
             <div class="form-group"><label>Modelo *</label><input type="text" id="prod-modelo" required></div>
@@ -583,13 +653,13 @@
             const codigo = obtenerValor('prod-codigo');
             if (data.productos.some(p => p.codigo === codigo)) { alert('Código ya existe.'); return; }
             const nuevo = {
-                codigo, descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
+                codigo, categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
                 modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
                 imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
                 condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios')
             };
             const { error } = await sb.from('productos').insert({
-                codigo: nuevo.codigo, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
+                codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
                 numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios
             });
             if (error) { alert('Error al guardar: ' + error.message); return; }
@@ -625,6 +695,7 @@
             if (!prod) return;
             const html = `
                 <input type="hidden" id="prod-codigo" value="${prod.codigo}">
+                <div class="form-group"><label>Categoría</label><input type="text" id="prod-categoria" value="${prod.categoria || ''}"></div>
                 <div class="form-group"><label>Descripción</label><input type="text" id="prod-descripcion" value="${prod.descripcion}"></div>
                 <div class="form-group"><label>Marca</label><input type="text" id="prod-marca" value="${prod.marca}"></div>
                 <div class="form-group"><label>Modelo</label><input type="text" id="prod-modelo" value="${prod.modelo}"></div>
@@ -635,9 +706,9 @@
                 <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios || ''}</textarea></div>
             `;
             abrirModal('Editar Producto', html, async () => {
-                const cambios = { descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios') };
+                const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios') };
                 const { error } = await sb.from('productos').update({
-                    descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
+                    categoria: cambios.categoria, descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
                     numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
                     condicion: cambios.condicion, accesorios: cambios.accesorios
                 }).eq('codigo', prod.codigo);
@@ -750,9 +821,16 @@
                 <div class="form-group"><label>Usuario</label><select id="asig-usuario">${opcionesUsr}</select></div>
                 <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="asig-encargado">${opcionesEnc}</select></div>
+                <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="asig-vale" accept="image/*,.pdf"></div>
+                <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="asig-foto" accept="image/*" capture="environment"></div>
             `;
             abrirModal('Nueva Asignación', html, async () => {
-                const nueva = { codigo_producto: obtenerValor('asig-producto'), dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo' };
+                const codigoProd = obtenerValor('asig-producto');
+                const archivoVale = document.getElementById('asig-vale').files[0];
+                const archivoFoto = document.getElementById('asig-foto').files[0];
+                const urlVale = await subirEvidencia(archivoVale, `vale_${codigoProd}`);
+                const urlFoto = await subirEvidencia(archivoFoto, `foto_${codigoProd}`);
+                const nueva = { codigo_producto: codigoProd, dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo', url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
@@ -783,12 +861,41 @@
             const html = `<p>Producto: ${original.codigoProducto}</p>
                 <div class="form-group"><label>Nuevo Usuario</label><select id="reasig-usuario">${opcionesUsr}</select></div>
                 <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
-                <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>`;
+                <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>
+                <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="reasig-vale" accept="image/*,.pdf"></div>
+                <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="reasig-foto" accept="image/*" capture="environment"></div>`;
             abrirModal('Reasignar Producto', html, async () => {
-                const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo' };
+                const archivoVale = document.getElementById('reasig-vale').files[0];
+                const archivoFoto = document.getElementById('reasig-foto').files[0];
+                const urlVale = await subirEvidencia(archivoVale, `vale_${original.codigoProducto}`);
+                const urlFoto = await subirEvidencia(archivoFoto, `foto_${original.codigoProducto}`);
+                const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo', url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
+            });
+        }
+        // Ver / subir evidencia (vale de salida y foto de entrega)
+        if (e.target.classList.contains('btn-evidencia')) {
+            const asig = data.asignaciones.find(a => a.id == e.target.dataset.id);
+            if (!asig) return;
+            const html = `
+                ${asig.urlVale ? `<p>📄 Vale de salida: <a href="${asig.urlVale}" target="_blank">Ver archivo</a></p>` : '<p style="color:#888;">Sin vale de salida cargado.</p>'}
+                ${asig.urlFoto ? `<p>📷 Foto de entrega:</p><img src="${asig.urlFoto}" style="max-width:100%; border-radius:6px; margin-bottom:0.5rem;">` : '<p style="color:#888;">Sin foto de entrega cargada.</p>'}
+                <div class="form-group" style="margin-top:1rem;"><label>Subir / reemplazar vale de salida</label><input type="file" id="ev-vale" accept="image/*,.pdf"></div>
+                <div class="form-group"><label>Subir / reemplazar foto de entrega</label><input type="file" id="ev-foto" accept="image/*" capture="environment"></div>
+            `;
+            abrirModal(`Evidencia - Asignación #${asig.id}`, html, async () => {
+                const archivoVale = document.getElementById('ev-vale').files[0];
+                const archivoFoto = document.getElementById('ev-foto').files[0];
+                const cambios = {};
+                if (archivoVale) cambios.url_vale = await subirEvidencia(archivoVale, `vale_${asig.codigoProducto}`);
+                if (archivoFoto) cambios.url_foto = await subirEvidencia(archivoFoto, `foto_${asig.codigoProducto}`);
+                if (Object.keys(cambios).length === 0) return;
+                const { error } = await sb.from('asignaciones').update(cambios).eq('id', asig.id);
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                if (cambios.url_vale) asig.urlVale = cambios.url_vale;
+                if (cambios.url_foto) asig.urlFoto = cambios.url_foto;
             });
         }
         // Eliminar asignación
