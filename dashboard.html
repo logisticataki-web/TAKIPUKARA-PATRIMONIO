@@ -214,16 +214,7 @@
 <div class="modal" id="modal"><div class="modal-content" id="modal-body"></div></div>
 
 <script>
-    // =========================================================
-    // CONFIGURACIÓN DE SUPABASE
-    // 1. Crea tu proyecto en https://supabase.com
-    // 2. Ve a Project Settings > API
-    // 3. Copia "Project URL" y pégalo abajo en SUPABASE_URL
-    // 4. Copia la clave "anon public" y pégala en SUPABASE_ANON_KEY
-    //    (esta clave SÍ está diseñada para ir en el frontend, no es secreta)
-    // 5. Antes de esto, corre schema_supabase.sql en el SQL Editor de tu proyecto
-    // =========================================================
-    const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co/rest/v1/';
+    const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56dGRzZ3RybHpzanJ6cnB0dm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjQ1MDgsImV4cCI6MjEwMDg0MDUwOH0.b_WpYQdCWY0Uq37gu6UdUq5MMnzCgKbWPgQOkM2Jzec';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
