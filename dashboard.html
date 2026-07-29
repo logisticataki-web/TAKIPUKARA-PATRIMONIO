@@ -216,7 +216,7 @@
 <script>
     const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56dGRzZ3RybHpzanJ6cnB0dm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjQ1MDgsImV4cCI6MjEwMDg0MDUwOH0.b_WpYQdCWY0Uq37gu6UdUq5MMnzCgKbWPgQOkM2Jzec';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const SESSION_KEY = 'takipukara_session';
     const SESSION_HORAS = 12;
@@ -240,11 +240,11 @@
 
     async function cargarDatos() {
         const [prod, usr, asig, enc, cta] = await Promise.all([
-            supabase.from('productos').select('*').order('codigo'),
-            supabase.from('usuarios').select('*').order('nombre'),
-            supabase.from('asignaciones').select('*').order('id'),
-            supabase.from('encargados').select('*').order('nombre'),
-            supabase.from('cuentas').select('*').order('usuario')
+            sb.from('productos').select('*').order('codigo'),
+            sb.from('usuarios').select('*').order('nombre'),
+            sb.from('asignaciones').select('*').order('id'),
+            sb.from('encargados').select('*').order('nombre'),
+            sb.from('cuentas').select('*').order('usuario')
         ]);
         if (prod.error || usr.error || asig.error || enc.error || cta.error) {
             console.error(prod.error || usr.error || asig.error || enc.error || cta.error);
@@ -319,7 +319,7 @@
         if (!ok) return;
         if (data.cuentas.length === 0) {
             const hash = await sha256('admin123');
-            const { error } = await supabase.from('cuentas').insert({ usuario: 'admin', nombre: 'Administrador', rol: 'admin', hash });
+            const { error } = await sb.from('cuentas').insert({ usuario: 'admin', nombre: 'Administrador', rol: 'admin', hash });
             if (!error) {
                 data.cuentas = [{ usuario: 'admin', nombre: 'Administrador', rol: 'admin', hash }];
                 document.getElementById('login-status').textContent = 'Cuenta inicial creada: admin / admin123 (cámbiala luego de ingresar)';
@@ -364,8 +364,8 @@
             const raw = document.getElementById('txt-encargados').value;
             let nombres = raw.split(',').map(n => n.trim()).filter(n => n.length > 0);
             if (nombres.length === 0) nombres = ['Logística TAKIPUKARA'];
-            await supabase.from('encargados').delete().not('nombre', 'is', null);
-            const { error } = await supabase.from('encargados').insert(nombres.map(nombre => ({ nombre })));
+            await sb.from('encargados').delete().not('nombre', 'is', null);
+            const { error } = await sb.from('encargados').insert(nombres.map(nombre => ({ nombre })));
             if (error) { alert('Error al guardar encargados: ' + error.message); return; }
             data.encargados = nombres;
         });
@@ -539,7 +539,7 @@
             });
             let agregados = 0;
             if (nuevos.length > 0) {
-                const { data: insertados, error } = await supabase.from('productos')
+                const { data: insertados, error } = await sb.from('productos')
                     .upsert(nuevos, { onConflict: 'codigo', ignoreDuplicates: true })
                     .select();
                 if (error) { alert('Error al importar: ' + error.message); return; }
@@ -588,7 +588,7 @@
                 imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
                 condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios')
             };
-            const { error } = await supabase.from('productos').insert({
+            const { error } = await sb.from('productos').insert({
                 codigo: nuevo.codigo, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
                 numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios
             });
@@ -611,7 +611,7 @@
             if (data.cuentas.some(c => c.usuario.toLowerCase() === usuario.toLowerCase())) { alert('Ese usuario ya existe.'); return; }
             const nombre = obtenerValor('cta-nombre'); const rol = obtenerValor('cta-rol');
             const hash = await sha256(document.getElementById('cta-password').value);
-            const { error } = await supabase.from('cuentas').insert({ usuario, nombre, rol, hash });
+            const { error } = await sb.from('cuentas').insert({ usuario, nombre, rol, hash });
             if (error) { alert('Error al guardar: ' + error.message); return; }
             data.cuentas.push({ usuario, nombre, rol, hash });
         });
@@ -636,7 +636,7 @@
             `;
             abrirModal('Editar Producto', html, async () => {
                 const cambios = { descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios') };
-                const { error } = await supabase.from('productos').update({
+                const { error } = await sb.from('productos').update({
                     descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
                     numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
                     condicion: cambios.condicion, accesorios: cambios.accesorios
@@ -649,7 +649,7 @@
         if (e.target.classList.contains('btn-eliminar-prod')) {
             const codigo = e.target.dataset.codigo;
             if (confirm('¿Eliminar producto y sus asignaciones?')) {
-                const { error } = await supabase.from('productos').delete().eq('codigo', codigo);
+                const { error } = await sb.from('productos').delete().eq('codigo', codigo);
                 if (error) { alert('Error al eliminar: ' + error.message); return; }
                 data.productos = data.productos.filter(p => p.codigo !== codigo);
                 data.asignaciones = data.asignaciones.filter(a => a.codigoProducto !== codigo);
@@ -673,7 +673,7 @@
                 const dni = obtenerValor('usr-dni');
                 if (data.usuarios.some(u => u.dni === dni)) { alert('DNI ya existe'); return; }
                 const nuevo = { nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
-                const { error } = await supabase.from('usuarios').insert(nuevo);
+                const { error } = await sb.from('usuarios').insert(nuevo);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.usuarios.push(nuevo);
             });
@@ -690,7 +690,7 @@
             `;
             abrirModal('Editar Usuario', html, async () => {
                 const cambios = { nombre: obtenerValor('usr-nombre'), area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
-                const { error } = await supabase.from('usuarios').update(cambios).eq('dni', usr.dni);
+                const { error } = await sb.from('usuarios').update(cambios).eq('dni', usr.dni);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 Object.assign(usr, cambios);
             });
@@ -699,7 +699,7 @@
         if (e.target.classList.contains('btn-eliminar-usr')) {
             const dni = e.target.dataset.dni;
             if (confirm('¿Eliminar usuario y sus asignaciones?')) {
-                const { error } = await supabase.from('usuarios').delete().eq('dni', dni);
+                const { error } = await sb.from('usuarios').delete().eq('dni', dni);
                 if (error) { alert('Error al eliminar: ' + error.message); return; }
                 data.usuarios = data.usuarios.filter(u => u.dni !== dni);
                 data.asignaciones = data.asignaciones.filter(a => a.dniUsuario !== dni);
@@ -721,7 +721,7 @@
                 const nuevaPass = document.getElementById('cta-password').value;
                 const cambios = { nombre, rol };
                 if (nuevaPass) cambios.hash = await sha256(nuevaPass);
-                const { error } = await supabase.from('cuentas').update(cambios).eq('usuario', cta.usuario);
+                const { error } = await sb.from('cuentas').update(cambios).eq('usuario', cta.usuario);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 Object.assign(cta, cambios);
             });
@@ -732,7 +732,7 @@
             if (!cta) return;
             if (cta.rol === 'admin' && data.cuentas.filter(c => c.rol === 'admin').length <= 1) { alert('No puedes eliminar el único administrador.'); return; }
             if (confirm('¿Eliminar esta cuenta?')) {
-                const { error } = await supabase.from('cuentas').delete().eq('usuario', cta.usuario);
+                const { error } = await sb.from('cuentas').delete().eq('usuario', cta.usuario);
                 if (error) { alert('Error al eliminar: ' + error.message); return; }
                 data.cuentas = data.cuentas.filter(c => c.usuario !== cta.usuario);
                 renderizar();
@@ -753,7 +753,7 @@
             `;
             abrirModal('Nueva Asignación', html, async () => {
                 const nueva = { codigo_producto: obtenerValor('asig-producto'), dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo' };
-                const { data: fila, error } = await supabase.from('asignaciones').insert(nueva).select().single();
+                const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
             });
@@ -767,7 +767,7 @@
         if (e.target.classList.contains('btn-devolver')) {
             const asig = data.asignaciones.find(a => a.id == e.target.dataset.id);
             if (asig && confirm('¿Marcar como devuelto?')) {
-                const { error } = await supabase.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asig.id);
+                const { error } = await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asig.id);
                 if (error) { alert('Error: ' + error.message); return; }
                 asig.estado = 'Devuelto';
                 renderizar();
@@ -786,7 +786,7 @@
                 <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>`;
             abrirModal('Reasignar Producto', html, async () => {
                 const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo' };
-                const { data: fila, error } = await supabase.from('asignaciones').insert(nueva).select().single();
+                const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
             });
@@ -795,7 +795,7 @@
         if (e.target.classList.contains('btn-eliminar-asig')) {
             const id = e.target.dataset.id;
             if (confirm('¿Eliminar asignación?')) {
-                const { error } = await supabase.from('asignaciones').delete().eq('id', id);
+                const { error } = await sb.from('asignaciones').delete().eq('id', id);
                 if (error) { alert('Error al eliminar: ' + error.message); return; }
                 data.asignaciones = data.asignaciones.filter(a => a.id != id);
                 renderizar();
