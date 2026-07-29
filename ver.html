@@ -122,7 +122,9 @@
             if (asignacion) {
                 secAsignacion.innerHTML += `<div class="fila"><span class="etiqueta">ID Asignación:</span><span class="valor">${asignacion.id}</span></div>
                 <div class="fila"><span class="etiqueta">Estado:</span><span class="valor">${asignacion.estado}</span></div>
-                <div class="fila"><span class="etiqueta">Encargado:</span><span class="valor">${asignacion.encargado}</span></div>`;
+                <div class="fila"><span class="etiqueta">Encargado:</span><span class="valor">${asignacion.encargado}</span></div>
+                ${asignacion.url_vale ? `<div class="fila"><span class="etiqueta">Vale de salida:</span><span class="valor"><a href="${asignacion.url_vale}" target="_blank">Ver archivo</a></span></div>` : ''}
+                ${asignacion.url_foto ? `<div style="margin-top:0.8rem;"><span class="etiqueta">Foto de entrega:</span><br><img src="${asignacion.url_foto}" style="width:100%; border-radius:6px; margin-top:0.4rem;"></div>` : ''}`;
             } else {
                 secAsignacion.innerHTML += '<p>Este equipo no tiene una asignación activa registrada.</p>';
             }
