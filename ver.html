@@ -3,91 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAKIPUKARA SAC - Detalle</title>
+    <title>TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN - Ficha de Equipo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --amarillo: #FFC107; --negro: #1E1E1E; --blanco: #FFFFFF; }
+        :root { --amarillo: #FFC107; --negro: #1E1E1E; --blanco: #FFFFFF; --verde:#155724; --verdefondo:#D4EDDA; }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
         body { background:#f5f5f5; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:1rem; }
         .tarjeta { background:white; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); max-width:500px; width:100%; overflow:hidden; border-top:6px solid var(--amarillo); }
         .encabezado { background:var(--negro); color:var(--amarillo); text-align:center; padding:1.5rem 1rem; }
-        .encabezado img { width:100px; height:auto; margin-bottom:0.5rem; }
-        .encabezado h1 { font-size:1.5rem; margin:0; }
-        .encabezado .fecha { font-size:0.9rem; color:#ccc; margin-top:0.5rem; }
+        .encabezado img { width:90px; height:auto; margin-bottom:0.5rem; }
+        .encabezado h1 { font-size:1.4rem; margin:0; letter-spacing:0.5px; }
+        .encabezado .sub { font-size:0.75rem; color:#ccc; letter-spacing:1px; margin-top:0.2rem; }
+        .encabezado .fecha { font-size:0.85rem; color:#ccc; margin-top:0.6rem; }
+        .estado-banner { text-align:center; padding:0.6rem; font-weight:700; font-size:0.95rem; }
+        .estado-activo { background:var(--verdefondo); color:var(--verde); }
+        .estado-libre { background:#FFF3CD; color:#856404; }
         .seccion { padding:1rem 1.5rem; border-bottom:1px solid #eee; }
         .seccion:last-of-type { border-bottom:none; }
         .seccion h2 { color:var(--negro); font-size:1.1rem; margin-bottom:0.8rem; border-left:4px solid var(--amarillo); padding-left:0.8rem; }
-        .fila { display:flex; justify-content:space-between; margin-bottom:0.5rem; }
-        .fila .etiqueta { font-weight:600; color:#555; }
+        .fila { display:flex; justify-content:space-between; margin-bottom:0.5rem; gap:1rem; }
+        .fila .etiqueta { font-weight:600; color:#555; white-space:nowrap; }
         .fila .valor { color:var(--negro); text-align:right; }
         .qr-footer { background:var(--negro); color:var(--amarillo); text-align:center; padding:0.8rem; font-size:0.85rem; }
         .btn-imprimir { display:block; width:90%; margin:1rem auto; background:var(--amarillo); color:var(--negro); border:none; padding:0.8rem; font-weight:bold; border-radius:6px; cursor:pointer; font-size:1rem; }
+        .mensaje { text-align:center; margin-top:3rem; padding:1rem; color:#555; }
         @media print { body { background:white; } .btn-imprimir { display:none; } }
     </style>
 </head>
 <body>
     <div class="tarjeta">
         <div class="encabezado">
-            <img src="logo.png" alt="Logo TAKIPUKARA" style="width:120px;">
-            <h1>TAKIPUKARA SAC</h1>
+            <img src="logo.png" alt="Logo TAKIPUKARA">
+            <h1>TAKIPUKARA</h1>
+            <div class="sub">MINERÍA &amp; CONSTRUCCIÓN</div>
             <div class="fecha" id="fecha-asignacion"></div>
         </div>
-        <div class="seccion" id="seccion-usuario"><h2>👤 Usuario</h2></div>
+        <div id="estado-banner"></div>
         <div class="seccion" id="seccion-producto"><h2>📦 Producto</h2></div>
+        <div class="seccion" id="seccion-usuario"><h2>👤 Usuario asignado</h2></div>
         <div class="seccion" id="seccion-asignacion"><h2>🏷️ Asignación</h2></div>
         <div class="qr-footer">Área de entrega: LOGÍSTICA TAKIPUKARA</div>
         <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir</button>
     </div>
     <script>
+        // Mismas credenciales públicas ("anon key") que en dashboard.html
+        const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co/rest/v1/';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56dGRzZ3RybHpzanJ6cnB0dm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjQ1MDgsImV4cCI6MjEwMDg0MDUwOH0.b_WpYQdCWY0Uq37gu6UdUq5MMnzCgKbWPgQOkM2Jzec';
+
         (async function() {
+            if (SUPABASE_URL.includes('PEGA_AQUI') || SUPABASE_ANON_KEY.includes('PEGA_AQUI')) {
+                document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Falta configurar Supabase en este archivo.</p></div>';
+                return;
+            }
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
             const urlParams = new URLSearchParams(window.location.search);
-            const idAsignacion = urlParams.get('id');
-            if (!idAsignacion) return document.body.innerHTML = '<h2 style="text-align:center;margin-top:3rem;">Asignación no encontrada</h2>';
+            const codigo = urlParams.get('codigo');
 
-            const BIN_ID = '6a63ec30f5f4af5e29bda3ba';  
-            const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-
-            let datos;
-            try {
-                const res = await fetch(BASE_URL, { headers: { 'X-Master-Key': '' } }); // lectura sin clave
-                const json = await res.json();
-                datos = json.record;
-            } catch (e) {
-                return document.body.innerHTML = '<h2>Error al cargar datos</h2>';
+            if (!codigo) {
+                document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Código no válido o faltante en el enlace.</p></div>';
+                return;
             }
 
-            const asignacion = datos.asignaciones.find(a => a.id == idAsignacion);
-            if (!asignacion) return document.body.innerHTML = '<h2>Asignación no encontrada</h2>';
+            const { data: producto, error: errProd } = await supabase.from('productos').select('*').eq('codigo', codigo).maybeSingle();
+            if (errProd) {
+                document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Error al cargar datos. Verifica tu conexión e intenta de nuevo.</p></div>';
+                return;
+            }
+            if (!producto) {
+                document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Producto no encontrado.</p></div>';
+                return;
+            }
 
-            const producto = datos.productos.find(p => p.codigo === asignacion.codigoProducto);
-            const usuario = datos.usuarios.find(u => u.dni === asignacion.dniUsuario);
+            const { data: asignacion } = await supabase.from('asignaciones').select('*').eq('codigo_producto', codigo).eq('estado', 'Activo').maybeSingle();
+            let usuario = null;
+            if (asignacion) {
+                const { data: u } = await supabase.from('usuarios').select('*').eq('dni', asignacion.dni_usuario).maybeSingle();
+                usuario = u;
+            }
 
-            document.getElementById('fecha-asignacion').textContent = `Fecha: ${asignacion.fecha}`;
+            document.getElementById('fecha-asignacion').textContent = asignacion ? `Fecha: ${asignacion.fecha}` : '';
 
+            // Banner de estado
+            const banner = document.getElementById('estado-banner');
+            if (asignacion) {
+                banner.className = 'estado-banner estado-activo';
+                banner.textContent = '✅ Actualmente asignado';
+            } else {
+                banner.className = 'estado-banner estado-libre';
+                banner.textContent = '📦 Disponible en almacén (sin asignar)';
+            }
+
+            // Producto
+            const secProducto = document.getElementById('seccion-producto');
+            secProducto.innerHTML += `<div class="fila"><span class="etiqueta">Código:</span><span class="valor">${producto.codigo}</span></div>
+            <div class="fila"><span class="etiqueta">Descripción:</span><span class="valor">${producto.descripcion}</span></div>
+            <div class="fila"><span class="etiqueta">Marca:</span><span class="valor">${producto.marca}</span></div>
+            <div class="fila"><span class="etiqueta">Modelo:</span><span class="valor">${producto.modelo}</span></div>
+            <div class="fila"><span class="etiqueta">Nº Serie:</span><span class="valor">${producto.numero_serie}</span></div>
+            ${producto.imei ? `<div class="fila"><span class="etiqueta">IMEI:</span><span class="valor">${producto.imei}</span></div>` : ''}
+            <div class="fila"><span class="etiqueta">Color:</span><span class="valor">${producto.color || '-'}</span></div>
+            <div class="fila"><span class="etiqueta">Condición:</span><span class="valor">${producto.condicion}</span></div>
+            <div class="fila"><span class="etiqueta">Accesorios:</span><span class="valor">${producto.accesorios || '-'}</span></div>`;
+
+            // Usuario
             const secUsuario = document.getElementById('seccion-usuario');
             if (usuario) {
                 secUsuario.innerHTML += `<div class="fila"><span class="etiqueta">Nombre:</span><span class="valor">${usuario.nombre}</span></div>
                 <div class="fila"><span class="etiqueta">DNI:</span><span class="valor">${usuario.dni}</span></div>
                 <div class="fila"><span class="etiqueta">Área:</span><span class="valor">${usuario.area}</span></div>
                 <div class="fila"><span class="etiqueta">Cargo:</span><span class="valor">${usuario.cargo}</span></div>`;
-            } else secUsuario.innerHTML += '<p>Usuario no encontrado</p>';
+            } else {
+                secUsuario.innerHTML += '<p>Sin asignar actualmente</p>';
+            }
 
-            const secProducto = document.getElementById('seccion-producto');
-            if (producto) {
-                secProducto.innerHTML += `<div class="fila"><span class="etiqueta">Código:</span><span class="valor">${producto.codigo}</span></div>
-                <div class="fila"><span class="etiqueta">Descripción:</span><span class="valor">${producto.descripcion}</span></div>
-                <div class="fila"><span class="etiqueta">Marca:</span><span class="valor">${producto.marca}</span></div>
-                <div class="fila"><span class="etiqueta">Modelo:</span><span class="valor">${producto.modelo}</span></div>
-                <div class="fila"><span class="etiqueta">Nº Serie:</span><span class="valor">${producto.numeroSerie}</span></div>
-                ${producto.imei ? `<div class="fila"><span class="etiqueta">IMEI:</span><span class="valor">${producto.imei}</span></div>` : ''}
-                <div class="fila"><span class="etiqueta">Color:</span><span class="valor">${producto.color || '-'}</span></div>
-                <div class="fila"><span class="etiqueta">Condición:</span><span class="valor">${producto.condicion}</span></div>
-                <div class="fila"><span class="etiqueta">Accesorios:</span><span class="valor">${producto.accesorios || '-'}</span></div>`;
-            } else secProducto.innerHTML += '<p>Producto no encontrado</p>';
-
+            // Asignación
             const secAsignacion = document.getElementById('seccion-asignacion');
-            secAsignacion.innerHTML += `<div class="fila"><span class="etiqueta">ID Asignación:</span><span class="valor">${asignacion.id}</span></div>
-            <div class="fila"><span class="etiqueta">Estado:</span><span class="valor">${asignacion.estado}</span></div>
-            <div class="fila"><span class="etiqueta">Encargado:</span><span class="valor">${asignacion.encargado}</span></div>`;
+            if (asignacion) {
+                secAsignacion.innerHTML += `<div class="fila"><span class="etiqueta">ID Asignación:</span><span class="valor">${asignacion.id}</span></div>
+                <div class="fila"><span class="etiqueta">Estado:</span><span class="valor">${asignacion.estado}</span></div>
+                <div class="fila"><span class="etiqueta">Encargado:</span><span class="valor">${asignacion.encargado}</span></div>`;
+            } else {
+                secAsignacion.innerHTML += '<p>Este equipo no tiene una asignación activa registrada.</p>';
+            }
         })();
     </script>
 </body>

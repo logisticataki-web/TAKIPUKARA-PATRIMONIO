@@ -1,10 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAKIPUKARA SAC - Panel de Gestión</title>
+    <title>TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN - Panel de Gestión</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --amarillo: #FFC107;
@@ -23,8 +25,9 @@
             padding:2rem 1rem; gap:2rem;
         }
         .logo-container { text-align:center; border-bottom:2px solid var(--amarillo); padding-bottom:1rem; }
-        .logo-container img { width:120px; height:auto; margin-bottom:0.5rem; }
-        .logo-container .empresa-nombre { font-weight:bold; font-size:1.2rem; color:var(--amarillo); }
+        .logo-container img { width:110px; height:auto; margin-bottom:0.5rem; }
+        .logo-container .empresa-nombre { font-weight:bold; font-size:1.2rem; color:var(--amarillo); letter-spacing:0.5px; }
+        .logo-container .empresa-sub { font-size:0.7rem; color:#bbb; letter-spacing:1px; margin-top:0.2rem; }
         .sidebar nav { display:flex; flex-direction:column; gap:0.5rem; }
         .sidebar nav button {
             background:transparent; border:none; color:#ccc; padding:0.8rem 1rem;
@@ -36,7 +39,9 @@
         .topbar {
             background:white; padding:1rem 2rem; box-shadow:0 2px 8px rgba(0,0,0,0.1);
             display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid var(--amarillo);
+            flex-wrap:wrap; gap:0.8rem;
         }
+        .topbar-right { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap; }
         .content { padding:2rem; flex:1; }
         .card { background:white; border-radius:var(--radio); box-shadow:0 2px 12px rgba(0,0,0,0.08); padding:1.5rem; }
         .table-wrapper { overflow-x:auto; }
@@ -64,25 +69,64 @@
             max-height:90vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3);
         }
         .modal-content h3 { margin-bottom:1rem; color:var(--negro); border-bottom:2px solid var(--amarillo); padding-bottom:0.5rem; }
-        .form-group { margin-bottom:1rem; }
+        .form-group { margin-bottom:1rem; text-align:left; }
         .form-group label { display:block; font-weight:600; margin-bottom:0.3rem; }
         .form-group input, .form-group select, .form-group textarea {
             width:100%; padding:0.6rem; border:1px solid var(--borde); border-radius:6px; font-size:1rem;
         }
         .flex-end { display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem; }
         .btn-config { background:transparent; border:1px dashed var(--amarillo); color:var(--amarillo); padding:0.3rem 0.6rem; font-size:0.8rem; }
+        .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem; }
+        .toolbar input[type="text"] { flex:1; min-width:200px; padding:0.6rem; border:1px solid #ddd; border-radius:6px; }
+        .toolbar-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
+        #login-overlay {
+            position:fixed; inset:0; background:var(--negro); z-index:2000;
+            display:flex; justify-content:center; align-items:center;
+        }
+        .login-box {
+            background:white; padding:2.5rem 2rem; border-radius:12px; width:90%; max-width:380px;
+            text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.4);
+        }
+        .login-box img { width:90px; margin-bottom:0.6rem; }
+        .login-box h2 { color:var(--negro); letter-spacing:0.5px; }
+        .login-box .sub { color:#888; font-size:0.8rem; margin-bottom:1.5rem; letter-spacing:1px; }
+        #login-error { display:none; color:var(--rojo); margin-top:0.8rem; font-size:0.9rem; }
+        #login-status { color:#888; font-size:0.85rem; margin-top:0.6rem; }
+        #config-warning {
+            display:none; position:fixed; top:0; left:0; right:0; background:var(--rojo); color:white;
+            text-align:center; padding:0.6rem; font-size:0.85rem; z-index:3000; font-weight:600;
+        }
     </style>
 </head>
 <body>
+
+<div id="config-warning">⚠️ Falta configurar SUPABASE_URL y SUPABASE_ANON_KEY al inicio del script. Revisa las instrucciones.</div>
+
+<!-- ===== PANTALLA DE LOGIN ===== -->
+<div id="login-overlay">
+    <div class="login-box">
+        <img src="logo.png" alt="Logo TAKIPUKARA">
+        <h2>TAKIPUKARA</h2>
+        <div class="sub">MINERÍA &amp; CONSTRUCCIÓN</div>
+        <div class="form-group"><label>Usuario</label><input type="text" id="login-usuario" autocomplete="username"></div>
+        <div class="form-group"><label>Contraseña</label><input type="password" id="login-password" autocomplete="current-password"></div>
+        <button class="btn btn-amarillo" id="btn-login" style="width:100%; padding:0.8rem;" disabled>Cargando...</button>
+        <p id="login-error">Usuario o contraseña incorrectos.</p>
+        <p id="login-status"></p>
+    </div>
+</div>
+
 <div class="sidebar">
     <div class="logo-container">
-        <img src="logo.png" alt="Logo TAKIPUKARA" style="width:120px;">
-        <div class="empresa-nombre">TAKIPUKARA SAC</div>
+        <img src="logo.png" alt="Logo TAKIPUKARA" style="width:110px;">
+        <div class="empresa-nombre">TAKIPUKARA</div>
+        <div class="empresa-sub">MINERÍA &amp; CONSTRUCCIÓN</div>
     </div>
     <nav>
         <button class="nav-btn active" data-view="asignaciones">🏷️ Asignaciones</button>
         <button class="nav-btn" data-view="productos">📦 Productos</button>
         <button class="nav-btn" data-view="usuarios">👥 Usuarios</button>
+        <button class="nav-btn" data-view="cuentas" id="nav-cuentas" style="display:none;">🔐 Cuentas</button>
         <button class="btn-config" id="btn-config-encargados">⚙️ Encargados</button>
     </nav>
 </div>
@@ -90,17 +134,20 @@
 <div class="main">
     <div class="topbar">
         <h2 id="view-title">Asignaciones</h2>
-        <div>
-            <button class="btn" style="background:var(--negro); color:var(--amarillo); border:2px solid var(--amarillo);" id="btn-exportar">📊 Exportar a Excel</button>
-            <span style="color:#666; margin-left:2rem;" id="reloj"></span>
+        <div class="topbar-right">
+            <button class="btn btn-outline" id="btn-refrescar">🔄 Actualizar</button>
+            <button class="btn" style="background:var(--negro); color:var(--amarillo); border:2px solid var(--amarillo);" id="btn-exportar">📊 Exportar Excel</button>
+            <span style="color:#666;" id="reloj"></span>
+            <span style="color:var(--negro); font-weight:600;" id="usuario-logueado"></span>
+            <button class="btn btn-outline btn-sm" id="btn-logout">Salir</button>
         </div>
     </div>
     <div class="content">
         <!-- Vista Asignaciones -->
         <div id="view-asignaciones" class="view">
             <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                    <input type="text" id="search-asignaciones" placeholder="Buscar..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                <div class="toolbar">
+                    <input type="text" id="search-asignaciones" placeholder="Buscar...">
                     <button class="btn btn-amarillo" id="btn-nueva-asignacion">+ Nueva Asignación</button>
                 </div>
                 <div class="table-wrapper">
@@ -114,9 +161,14 @@
         <!-- Vista Productos -->
         <div id="view-productos" class="view hidden">
             <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                    <input type="text" id="search-productos" placeholder="Buscar producto..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
-                    <button class="btn btn-amarillo" id="btn-nuevo-producto">+ Nuevo Producto</button>
+                <div class="toolbar">
+                    <input type="text" id="search-productos" placeholder="Buscar producto...">
+                    <div class="toolbar-actions">
+                        <button class="btn btn-outline btn-sm" id="btn-plantilla">📄 Plantilla</button>
+                        <button class="btn btn-outline btn-sm" id="btn-importar">📥 Importar Excel</button>
+                        <input type="file" id="input-importar" accept=".xlsx,.xls,.csv" style="display:none;">
+                        <button class="btn btn-amarillo" id="btn-nuevo-producto">+ Nuevo Producto</button>
+                    </div>
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-productos">
@@ -129,13 +181,28 @@
         <!-- Vista Usuarios -->
         <div id="view-usuarios" class="view hidden">
             <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                    <input type="text" id="search-usuarios" placeholder="Buscar usuario..." style="width:60%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                <div class="toolbar">
+                    <input type="text" id="search-usuarios" placeholder="Buscar usuario...">
                     <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-usuarios">
                         <thead><tr><th>Nombre</th><th>DNI</th><th>Área</th><th>Cargo</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Vista Cuentas del sistema (solo admin) -->
+        <div id="view-cuentas" class="view hidden">
+            <div class="card">
+                <div class="toolbar">
+                    <p style="color:#666;">Cuentas que pueden iniciar sesión en este panel.</p>
+                    <button class="btn btn-amarillo" id="btn-nueva-cuenta">+ Nueva Cuenta</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="tabla-cuentas">
+                        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -147,40 +214,135 @@
 <div class="modal" id="modal"><div class="modal-content" id="modal-body"></div></div>
 
 <script>
-    // ========= CONFIGURACIÓN =========
-    const BIN_ID = '6a63ec30f5f4af5e29bda3ba'
-    const API_KEY = '$2a$10$B1kWSjwjy6k5vMdg7Amm0OhrhypX3K1EP6ET0eJHtG/EssxCCYIXW'
-    const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+    // =========================================================
+    // CONFIGURACIÓN DE SUPABASE
+    // 1. Crea tu proyecto en https://supabase.com
+    // 2. Ve a Project Settings > API
+    // 3. Copia "Project URL" y pégalo abajo en SUPABASE_URL
+    // 4. Copia la clave "anon public" y pégala en SUPABASE_ANON_KEY
+    //    (esta clave SÍ está diseñada para ir en el frontend, no es secreta)
+    // 5. Antes de esto, corre schema_supabase.sql en el SQL Editor de tu proyecto
+    // =========================================================
+    const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56dGRzZ3RybHpzanJ6cnB0dm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjQ1MDgsImV4cCI6MjEwMDg0MDUwOH0.b_WpYQdCWY0Uq37gu6UdUq5MMnzCgKbWPgQOkM2Jzec';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const SESSION_KEY = 'takipukara_session';
+    const SESSION_HORAS = 12;
 
     let data = {
         productos: [],
         usuarios: [],
         asignaciones: [],
-        nextIdAsignacion: 1,
-        encargados: ["Juan Pérez", "María López", "Carlos Ruiz", "Ana Torres"]
+        encargados: [],
+        cuentas: []
     };
+    let sesion = null;
+
+    // ---- MAPEO fila de Supabase <-> objeto usado por la interfaz ----
+    function productoDesdeFila(p) {
+        return { codigo: p.codigo, descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios };
+    }
+    function asignacionDesdeFila(a) {
+        return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado };
+    }
 
     async function cargarDatos() {
+        const [prod, usr, asig, enc, cta] = await Promise.all([
+            supabase.from('productos').select('*').order('codigo'),
+            supabase.from('usuarios').select('*').order('nombre'),
+            supabase.from('asignaciones').select('*').order('id'),
+            supabase.from('encargados').select('*').order('nombre'),
+            supabase.from('cuentas').select('*').order('usuario')
+        ]);
+        if (prod.error || usr.error || asig.error || enc.error || cta.error) {
+            console.error(prod.error || usr.error || asig.error || enc.error || cta.error);
+            document.getElementById('login-status').textContent = 'No se pudo conectar con la base de datos. Revisa la configuración de Supabase.';
+            return false;
+        }
+        data.productos = prod.data.map(productoDesdeFila);
+        data.usuarios = usr.data.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo }));
+        data.asignaciones = asig.data.map(asignacionDesdeFila);
+        data.encargados = enc.data.map(e => e.nombre);
+        if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
+        data.cuentas = cta.data.map(c => ({ usuario: c.usuario, nombre: c.nombre, rol: c.rol, hash: c.hash }));
+        return true;
+    }
+
+    // ---- CRIPTO (hash de contraseñas) ----
+    async function sha256(texto) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // ---- SESIÓN / LOGIN ----
+    function leerSesionGuardada() {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
         try {
-            const res = await fetch(BASE_URL, { headers: { 'X-Master-Key': API_KEY } });
-            if (res.ok) {
-                const json = await res.json();
-                data = json.record;
-                if (!data.encargados) data.encargados = ["Juan Pérez", "María López", "Carlos Ruiz", "Ana Torres"];
-            }
-        } catch (e) { console.error(e); }
+            const s = JSON.parse(raw);
+            if (Date.now() - s.ts > SESSION_HORAS * 60 * 60 * 1000) { localStorage.removeItem(SESSION_KEY); return null; }
+            return s;
+        } catch (e) { return null; }
+    }
+
+    function aplicarSesion() {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('usuario-logueado').textContent = `${sesion.nombre} (${sesion.rol})`;
+        document.getElementById('nav-cuentas').style.display = sesion.rol === 'admin' ? 'block' : 'none';
         renderizar();
     }
 
-    async function guardar() {
-        try {
-            await fetch(BASE_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-                body: JSON.stringify(data)
-            });
-        } catch (e) { alert('Error al guardar en la nube'); }
+    async function intentarLogin() {
+        const usuario = obtenerValor('login-usuario');
+        const password = document.getElementById('login-password').value;
+        document.getElementById('login-error').style.display = 'none';
+        const hash = await sha256(password);
+        const cuenta = data.cuentas.find(c => c.usuario.toLowerCase() === usuario.toLowerCase() && c.hash === hash);
+        if (!cuenta) { document.getElementById('login-error').style.display = 'block'; return; }
+        sesion = { usuario: cuenta.usuario, nombre: cuenta.nombre, rol: cuenta.rol, ts: Date.now() };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sesion));
+        aplicarSesion();
     }
+
+    document.getElementById('btn-login').addEventListener('click', intentarLogin);
+    document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') intentarLogin(); });
+    document.getElementById('login-usuario').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        localStorage.removeItem(SESSION_KEY);
+        location.reload();
+    });
+    document.getElementById('btn-refrescar').addEventListener('click', async () => {
+        await cargarDatos();
+        renderizar();
+    });
+
+    // ---- INICIO ----
+    (async function iniciar() {
+        if (SUPABASE_URL.includes('PEGA_AQUI') || SUPABASE_ANON_KEY.includes('PEGA_AQUI')) {
+            document.getElementById('config-warning').style.display = 'block';
+            document.getElementById('login-status').textContent = 'Configura SUPABASE_URL y SUPABASE_ANON_KEY en el código.';
+            return;
+        }
+        const ok = await cargarDatos();
+        if (!ok) return;
+        if (data.cuentas.length === 0) {
+            const hash = await sha256('admin123');
+            const { error } = await supabase.from('cuentas').insert({ usuario: 'admin', nombre: 'Administrador', rol: 'admin', hash });
+            if (!error) {
+                data.cuentas = [{ usuario: 'admin', nombre: 'Administrador', rol: 'admin', hash }];
+                document.getElementById('login-status').textContent = 'Cuenta inicial creada: admin / admin123 (cámbiala luego de ingresar)';
+            }
+        }
+        const guardada = leerSesionGuardada();
+        if (guardada && data.cuentas.some(c => c.usuario === guardada.usuario)) {
+            sesion = guardada;
+            aplicarSesion();
+        }
+        const btnLogin = document.getElementById('btn-login');
+        btnLogin.disabled = false;
+        btnLogin.textContent = 'Ingresar';
+    })();
 
     // ---- RELOJ ----
     function reloj() { document.getElementById('reloj').textContent = new Date().toLocaleString('es-PE'); }
@@ -190,6 +352,7 @@
     const navBtns = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
     const viewTitle = document.getElementById('view-title');
+    const titulos = { asignaciones: 'Asignaciones', productos: 'Productos', usuarios: 'Usuarios', cuentas: 'Cuentas del Sistema' };
     navBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             navBtns.forEach(b => b.classList.remove('active'));
@@ -197,7 +360,7 @@
             const vista = btn.dataset.view;
             views.forEach(v => v.classList.add('hidden'));
             document.getElementById('view-' + vista).classList.remove('hidden');
-            viewTitle.textContent = vista === 'asignaciones' ? 'Asignaciones' : (vista === 'productos' ? 'Productos' : 'Usuarios');
+            viewTitle.textContent = titulos[vista] || vista;
             renderizar();
         });
     });
@@ -206,11 +369,14 @@
     document.getElementById('btn-config-encargados').addEventListener('click', () => {
         const html = `<div class="form-group"><label>Nombres de encargados (separados por coma)</label>
             <textarea id="txt-encargados" rows="4">${data.encargados.join(', ')}</textarea></div>`;
-        abrirModal('Configurar Encargados', html, () => {
+        abrirModal('Configurar Encargados', html, async () => {
             const raw = document.getElementById('txt-encargados').value;
-            data.encargados = raw.split(',').map(n => n.trim()).filter(n => n.length > 0);
-            if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
-            guardar().then(renderizar);
+            let nombres = raw.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (nombres.length === 0) nombres = ['Logística TAKIPUKARA'];
+            await supabase.from('encargados').delete().not('nombre', 'is', null);
+            const { error } = await supabase.from('encargados').insert(nombres.map(nombre => ({ nombre })));
+            if (error) { alert('Error al guardar encargados: ' + error.message); return; }
+            data.encargados = nombres;
         });
     });
 
@@ -218,6 +384,25 @@
     function obtenerProducto(codigo) { return data.productos.find(p => p.codigo === codigo); }
     function productoDisponible(codigo) {
         return !data.asignaciones.some(a => a.codigoProducto === codigo && a.estado === 'Activo');
+    }
+    function urlFichaProducto(codigo) {
+        return `${window.location.origin}${window.location.pathname.replace('dashboard.html', '')}ver.html?codigo=${encodeURIComponent(codigo)}`;
+    }
+    function mostrarQR(titulo, url) {
+        const modal = document.getElementById('modal');
+        const body = document.getElementById('modal-body');
+        body.innerHTML = `<h3>${titulo}</h3><div class="qr-container" id="qrcode" style="display:flex; justify-content:center; margin:1rem 0;"></div>
+            <p style="text-align:center; margin-top:0.5rem; word-break:break-all;"><a href="${url}" target="_blank">${url}</a></p>
+            <div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
+            <button class="btn btn-amarillo" id="btn-imprimir">Imprimir</button></div>`;
+        modal.style.display = 'flex';
+        const qrDiv = document.getElementById('qrcode'); qrDiv.innerHTML = '';
+        new QRCode(qrDiv, { text: url, width: 220, height: 220, colorDark: "#1E1E1E", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.H });
+        document.getElementById('btn-imprimir').onclick = () => {
+            const win = window.open('', '_blank');
+            win.document.write(`<html><head><title>QR</title></head><body style="text-align:center;font-family:sans-serif"><h2>TAKIPUKARA</h2><p style="color:#666;margin-bottom:1rem;">MINERÍA &amp; CONSTRUCCIÓN</p><img src="${qrDiv.querySelector('img').src}" style="width:250px"><p>${url}</p><script>window.print();<\/script></body></html>`);
+            win.document.close();
+        };
     }
 
     // ---- RENDERIZADO ----
@@ -244,7 +429,7 @@
                 <td><span class="badge ${estadoClase}">${a.estado}</span></td>
                 <td>${a.encargado}</td>
                 <td>
-                    ${a.estado === 'Activo' ? `<button class="btn btn-outline btn-sm btn-qr" data-id="${a.id}">QR</button>
+                    ${a.estado === 'Activo' ? `<button class="btn btn-outline btn-sm btn-qr" data-codigo="${a.codigoProducto}">QR</button>
                      <button class="btn btn-outline btn-sm btn-devolver" data-id="${a.id}">Devolver</button>` :
                      `<button class="btn btn-outline btn-sm btn-reasignar" data-id="${a.id}">Reasignar</button>`}
                     <button class="btn btn-danger btn-sm btn-eliminar-asig" data-id="${a.id}">Eliminar</button>
@@ -264,7 +449,8 @@
             <td>${p.codigo}</td><td>${p.descripcion}</td><td>${p.marca}</td><td>${p.modelo}</td>
             <td>${p.numeroSerie}</td><td>${p.imei || '-'}</td><td>${p.color || '-'}</td><td>${p.condicion}</td>
             <td>${p.accesorios || '-'}</td>
-            <td><button class="btn btn-outline btn-sm btn-editar-prod" data-codigo="${p.codigo}">Editar</button>
+            <td><button class="btn btn-outline btn-sm btn-qr-prod" data-codigo="${p.codigo}">QR</button>
+                <button class="btn btn-outline btn-sm btn-editar-prod" data-codigo="${p.codigo}">Editar</button>
                 <button class="btn btn-danger btn-sm btn-eliminar-prod" data-codigo="${p.codigo}">Eliminar</button></td>
         </tr>`).join('');
     }
@@ -283,29 +469,99 @@
         </tr>`).join('');
     }
 
+    function renderizarCuentas() {
+        const tbody = document.querySelector('#tabla-cuentas tbody');
+        tbody.innerHTML = data.cuentas.map(c => `<tr>
+            <td>${c.usuario}</td><td>${c.nombre}</td><td>${c.rol}</td>
+            <td><button class="btn btn-outline btn-sm btn-editar-cta" data-usuario="${c.usuario}">Editar</button>
+                <button class="btn btn-danger btn-sm btn-eliminar-cta" data-usuario="${c.usuario}">Eliminar</button></td>
+        </tr>`).join('');
+    }
+
     function renderizar() {
+        if (!sesion) return;
         const vistaActiva = document.querySelector('.view:not(.hidden)').id;
         if (vistaActiva === 'view-asignaciones') renderizarAsignaciones(document.getElementById('search-asignaciones')?.value || '');
         else if (vistaActiva === 'view-productos') renderizarProductos(document.getElementById('search-productos')?.value || '');
         else if (vistaActiva === 'view-usuarios') renderizarUsuarios(document.getElementById('search-usuarios')?.value || '');
+        else if (vistaActiva === 'view-cuentas') renderizarCuentas();
     }
 
-    // ---- EXPORTAR EXCEL ----
-    function exportarCSV() {
-        const encabezados = ['ID','Código Producto','Descripción','Marca','Modelo','Nº Serie','IMEI','Color','Condición','Accesorios','Usuario','DNI','Área','Cargo','Fecha','Estado','Encargado'];
-        const filas = [encabezados];
-        data.asignaciones.forEach(a => {
+    // ---- EXPORTAR A EXCEL (.xlsx real, 3 hojas) ----
+    function exportarExcel() {
+        const wsAsig = XLSX.utils.json_to_sheet(data.asignaciones.map(a => {
             const prod = obtenerProducto(a.codigoProducto);
             const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
-            filas.push([a.id, prod?.codigo||'', prod?.descripcion||'', prod?.marca||'', prod?.modelo||'', prod?.numeroSerie||'', prod?.imei||'', prod?.color||'', prod?.condicion||'', prod?.accesorios||'', usr?.nombre||'', usr?.dni||'', usr?.area||'', usr?.cargo||'', a.fecha, a.estado, a.encargado]);
-        });
-        let csv = '\uFEFF' + filas.map(f => f.map(c => /[",\n\r]/.test(c) ? `"${c.replace(/"/g,'""')}"` : c).join(',')).join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-        a.download = 'informe_takipukara_' + new Date().toISOString().slice(0,10) + '.csv';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            return { ID: a.id, 'Código Producto': prod?.codigo || '', Descripción: prod?.descripcion || '', Usuario: usr?.nombre || '', DNI: usr?.dni || '', Fecha: a.fecha, Estado: a.estado, Encargado: a.encargado };
+        }));
+        const wsProd = XLSX.utils.json_to_sheet(data.productos.map(p => ({
+            'Código': p.codigo, 'Descripción': p.descripcion, 'Marca': p.marca, 'Modelo': p.modelo,
+            'Nº Serie': p.numeroSerie, 'IMEI': p.imei || '', 'Color': p.color || '', 'Condición': p.condicion, 'Accesorios': p.accesorios || ''
+        })));
+        const wsUsr = XLSX.utils.json_to_sheet(data.usuarios.map(u => ({ Nombre: u.nombre, DNI: u.dni, 'Área': u.area, Cargo: u.cargo })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsAsig, 'Asignaciones');
+        XLSX.utils.book_append_sheet(wb, wsProd, 'Productos');
+        XLSX.utils.book_append_sheet(wb, wsUsr, 'Usuarios');
+        XLSX.writeFile(wb, 'takipukara_' + new Date().toISOString().slice(0, 10) + '.xlsx');
     }
-    document.getElementById('btn-exportar').addEventListener('click', exportarCSV);
+    document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
+
+    // ---- PLANTILLA E IMPORTAR PRODUCTOS DESDE EXCEL ----
+    document.getElementById('btn-plantilla').addEventListener('click', () => {
+        const ejemplo = [{ 'Código': 'EJ-0001', 'Descripción': 'Laptop Dell Latitude', 'Marca': 'Dell', 'Modelo': 'Latitude 5420', 'Nº Serie': 'ABC123456', 'IMEI': '', 'Color': 'Gris', 'Condición': 'Nuevo', 'Accesorios': 'Cargador, mochila' }];
+        const ws = XLSX.utils.json_to_sheet(ejemplo);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+        XLSX.writeFile(wb, 'plantilla_productos_takipukara.xlsx');
+    });
+
+    document.getElementById('btn-importar').addEventListener('click', () => document.getElementById('input-importar').click());
+    document.getElementById('input-importar').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const val = (r, ...claves) => { for (const k of claves) { if (r[k] !== undefined && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
+            const nuevos = [];
+            let sinCodigo = 0, yaEnPlanilla = 0;
+            const vistos = new Set();
+            filas.forEach(r => {
+                const codigo = val(r, 'Código', 'Codigo', 'código', 'codigo', 'CÓDIGO', 'CODIGO');
+                if (!codigo) { sinCodigo++; return; }
+                if (data.productos.some(p => p.codigo === codigo) || vistos.has(codigo)) { yaEnPlanilla++; return; }
+                vistos.add(codigo);
+                nuevos.push({
+                    codigo,
+                    descripcion: val(r, 'Descripción', 'Descripcion', 'descripción', 'descripcion'),
+                    marca: val(r, 'Marca', 'marca'),
+                    modelo: val(r, 'Modelo', 'modelo'),
+                    numero_serie: val(r, 'Nº Serie', 'N° Serie', 'Numero Serie', 'Número de Serie', 'Serie'),
+                    imei: val(r, 'IMEI', 'imei'),
+                    color: val(r, 'Color', 'color'),
+                    condicion: val(r, 'Condición', 'Condicion', 'condición') || 'Nuevo',
+                    accesorios: val(r, 'Accesorios', 'accesorios')
+                });
+            });
+            let agregados = 0;
+            if (nuevos.length > 0) {
+                const { data: insertados, error } = await supabase.from('productos')
+                    .upsert(nuevos, { onConflict: 'codigo', ignoreDuplicates: true })
+                    .select();
+                if (error) { alert('Error al importar: ' + error.message); return; }
+                agregados = insertados.length;
+                data.productos.push(...insertados.map(productoDesdeFila));
+            }
+            renderizar();
+            alert(`Importación completa.\nAgregados: ${agregados}\nYa existían / duplicados en el archivo: ${yaEnPlanilla}\nFilas sin código omitidas: ${sinCodigo}`);
+        } catch (err) {
+            alert('No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) válido y use la plantilla como referencia.');
+        }
+        e.target.value = '';
+    });
 
     // ---- MODAL GENÉRICO ----
     function abrirModal(titulo, html, onGuardar) {
@@ -314,7 +570,7 @@
         body.innerHTML = `<h3>${titulo}</h3>${html}<div class="flex-end"><button class="btn btn-outline" id="btn-cancelar">Cancelar</button><button class="btn btn-amarillo" id="btn-guardar">Guardar</button></div>`;
         modal.style.display = 'flex';
         document.getElementById('btn-cancelar').onclick = () => modal.style.display = 'none';
-        document.getElementById('btn-guardar').onclick = () => { onGuardar(); modal.style.display = 'none'; renderizar(); };
+        document.getElementById('btn-guardar').onclick = async () => { await onGuardar(); modal.style.display = 'none'; renderizar(); };
         modal.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
     }
     function obtenerValor(id) { return document.getElementById(id).value.trim(); }
@@ -332,21 +588,46 @@
             <div class="form-group"><label>Condición</label><select id="prod-condicion"><option>Nuevo</option><option>Usado</option><option>Reparado</option><option>Reacondicionado</option></select></div>
             <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios" rows="2"></textarea></div>
         `;
-        abrirModal('Nuevo Producto', html, () => {
+        abrirModal('Nuevo Producto', html, async () => {
             const codigo = obtenerValor('prod-codigo');
             if (data.productos.some(p => p.codigo === codigo)) { alert('Código ya existe.'); return; }
-            data.productos.push({
+            const nuevo = {
                 codigo, descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
                 modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
                 imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
                 condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios')
+            };
+            const { error } = await supabase.from('productos').insert({
+                codigo: nuevo.codigo, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
+                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios
             });
-            guardar();
+            if (error) { alert('Error al guardar: ' + error.message); return; }
+            data.productos.push(nuevo);
         });
     });
 
-    // ---- EVENTOS DELEGADOS (editar/eliminar usuarios, productos, asignaciones, QR, etc.) ----
-    document.addEventListener('click', e => {
+    // ---- NUEVA CUENTA ----
+    document.getElementById('btn-nueva-cuenta').addEventListener('click', () => {
+        const html = `
+            <div class="form-group"><label>Usuario *</label><input type="text" id="cta-usuario"></div>
+            <div class="form-group"><label>Nombre completo *</label><input type="text" id="cta-nombre"></div>
+            <div class="form-group"><label>Contraseña *</label><input type="password" id="cta-password"></div>
+            <div class="form-group"><label>Rol</label><select id="cta-rol"><option value="operador">Operador</option><option value="admin">Administrador</option></select></div>
+        `;
+        abrirModal('Nueva Cuenta', html, async () => {
+            const usuario = obtenerValor('cta-usuario');
+            if (!usuario) { alert('El usuario es obligatorio.'); return; }
+            if (data.cuentas.some(c => c.usuario.toLowerCase() === usuario.toLowerCase())) { alert('Ese usuario ya existe.'); return; }
+            const nombre = obtenerValor('cta-nombre'); const rol = obtenerValor('cta-rol');
+            const hash = await sha256(document.getElementById('cta-password').value);
+            const { error } = await supabase.from('cuentas').insert({ usuario, nombre, rol, hash });
+            if (error) { alert('Error al guardar: ' + error.message); return; }
+            data.cuentas.push({ usuario, nombre, rol, hash });
+        });
+    });
+
+    // ---- EVENTOS DELEGADOS ----
+    document.addEventListener('click', async e => {
         // Editar producto
         if (e.target.classList.contains('btn-editar-prod')) {
             const prod = data.productos.find(p => p.codigo === e.target.dataset.codigo);
@@ -357,26 +638,37 @@
                 <div class="form-group"><label>Marca</label><input type="text" id="prod-marca" value="${prod.marca}"></div>
                 <div class="form-group"><label>Modelo</label><input type="text" id="prod-modelo" value="${prod.modelo}"></div>
                 <div class="form-group"><label>Nº de serie</label><input type="text" id="prod-serie" value="${prod.numeroSerie}"></div>
-                <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei" value="${prod.imei||''}"></div>
-                <div class="form-group"><label>Color</label><input type="text" id="prod-color" value="${prod.color||''}"></div>
-                <div class="form-group"><label>Condición</label><select id="prod-condicion">${['Nuevo','Usado','Reparado','Reacondicionado'].map(o => `<option ${prod.condicion===o?'selected':''}>${o}</option>`).join('')}</select></div>
-                <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios||''}</textarea></div>
+                <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei" value="${prod.imei || ''}"></div>
+                <div class="form-group"><label>Color</label><input type="text" id="prod-color" value="${prod.color || ''}"></div>
+                <div class="form-group"><label>Condición</label><select id="prod-condicion">${['Nuevo', 'Usado', 'Reparado', 'Reacondicionado'].map(o => `<option ${prod.condicion === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+                <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios || ''}</textarea></div>
             `;
-            abrirModal('Editar Producto', html, () => {
-                prod.descripcion = obtenerValor('prod-descripcion'); prod.marca = obtenerValor('prod-marca');
-                prod.modelo = obtenerValor('prod-modelo'); prod.numeroSerie = obtenerValor('prod-serie');
-                prod.imei = obtenerValor('prod-imei'); prod.color = obtenerValor('prod-color');
-                prod.condicion = obtenerValor('prod-condicion'); prod.accesorios = obtenerValor('prod-accesorios');
-                guardar();
+            abrirModal('Editar Producto', html, async () => {
+                const cambios = { descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios') };
+                const { error } = await supabase.from('productos').update({
+                    descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
+                    numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
+                    condicion: cambios.condicion, accesorios: cambios.accesorios
+                }).eq('codigo', prod.codigo);
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                Object.assign(prod, cambios);
             });
         }
         // Eliminar producto
         if (e.target.classList.contains('btn-eliminar-prod')) {
+            const codigo = e.target.dataset.codigo;
             if (confirm('¿Eliminar producto y sus asignaciones?')) {
-                data.productos = data.productos.filter(p => p.codigo !== e.target.dataset.codigo);
-                data.asignaciones = data.asignaciones.filter(a => a.codigoProducto !== e.target.dataset.codigo);
-                guardar().then(renderizar);
+                const { error } = await supabase.from('productos').delete().eq('codigo', codigo);
+                if (error) { alert('Error al eliminar: ' + error.message); return; }
+                data.productos = data.productos.filter(p => p.codigo !== codigo);
+                data.asignaciones = data.asignaciones.filter(a => a.codigoProducto !== codigo);
+                renderizar();
             }
+        }
+        // QR de producto (permanente, desde Productos)
+        if (e.target.classList.contains('btn-qr-prod')) {
+            const codigo = e.target.dataset.codigo;
+            mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo));
         }
         // Nuevo usuario
         if (e.target.id === 'btn-nuevo-usuario') {
@@ -386,11 +678,13 @@
                 <div class="form-group"><label>Área *</label><input type="text" id="usr-area"></div>
                 <div class="form-group"><label>Cargo *</label><input type="text" id="usr-cargo"></div>
             `;
-            abrirModal('Nuevo Usuario', html, () => {
+            abrirModal('Nuevo Usuario', html, async () => {
                 const dni = obtenerValor('usr-dni');
                 if (data.usuarios.some(u => u.dni === dni)) { alert('DNI ya existe'); return; }
-                data.usuarios.push({ nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') });
-                guardar();
+                const nuevo = { nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
+                const { error } = await supabase.from('usuarios').insert(nuevo);
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                data.usuarios.push(nuevo);
             });
         }
         // Editar usuario
@@ -403,17 +697,54 @@
                 <div class="form-group"><label>Área</label><input type="text" id="usr-area" value="${usr.area}"></div>
                 <div class="form-group"><label>Cargo</label><input type="text" id="usr-cargo" value="${usr.cargo}"></div>
             `;
-            abrirModal('Editar Usuario', html, () => {
-                usr.nombre = obtenerValor('usr-nombre'); usr.area = obtenerValor('usr-area'); usr.cargo = obtenerValor('usr-cargo');
-                guardar();
+            abrirModal('Editar Usuario', html, async () => {
+                const cambios = { nombre: obtenerValor('usr-nombre'), area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
+                const { error } = await supabase.from('usuarios').update(cambios).eq('dni', usr.dni);
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                Object.assign(usr, cambios);
             });
         }
         // Eliminar usuario
         if (e.target.classList.contains('btn-eliminar-usr')) {
+            const dni = e.target.dataset.dni;
             if (confirm('¿Eliminar usuario y sus asignaciones?')) {
-                data.usuarios = data.usuarios.filter(u => u.dni !== e.target.dataset.dni);
-                data.asignaciones = data.asignaciones.filter(a => a.dniUsuario !== e.target.dataset.dni);
-                guardar().then(renderizar);
+                const { error } = await supabase.from('usuarios').delete().eq('dni', dni);
+                if (error) { alert('Error al eliminar: ' + error.message); return; }
+                data.usuarios = data.usuarios.filter(u => u.dni !== dni);
+                data.asignaciones = data.asignaciones.filter(a => a.dniUsuario !== dni);
+                renderizar();
+            }
+        }
+        // Editar cuenta
+        if (e.target.classList.contains('btn-editar-cta')) {
+            const cta = data.cuentas.find(c => c.usuario === e.target.dataset.usuario);
+            if (!cta) return;
+            const html = `
+                <div class="form-group"><label>Usuario</label><input type="text" value="${cta.usuario}" disabled></div>
+                <div class="form-group"><label>Nombre completo</label><input type="text" id="cta-nombre" value="${cta.nombre}"></div>
+                <div class="form-group"><label>Rol</label><select id="cta-rol"><option value="operador" ${cta.rol === 'operador' ? 'selected' : ''}>Operador</option><option value="admin" ${cta.rol === 'admin' ? 'selected' : ''}>Administrador</option></select></div>
+                <div class="form-group"><label>Nueva contraseña (dejar vacío para no cambiar)</label><input type="password" id="cta-password"></div>
+            `;
+            abrirModal('Editar Cuenta', html, async () => {
+                const nombre = obtenerValor('cta-nombre'); const rol = obtenerValor('cta-rol');
+                const nuevaPass = document.getElementById('cta-password').value;
+                const cambios = { nombre, rol };
+                if (nuevaPass) cambios.hash = await sha256(nuevaPass);
+                const { error } = await supabase.from('cuentas').update(cambios).eq('usuario', cta.usuario);
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                Object.assign(cta, cambios);
+            });
+        }
+        // Eliminar cuenta
+        if (e.target.classList.contains('btn-eliminar-cta')) {
+            const cta = data.cuentas.find(c => c.usuario === e.target.dataset.usuario);
+            if (!cta) return;
+            if (cta.rol === 'admin' && data.cuentas.filter(c => c.rol === 'admin').length <= 1) { alert('No puedes eliminar el único administrador.'); return; }
+            if (confirm('¿Eliminar esta cuenta?')) {
+                const { error } = await supabase.from('cuentas').delete().eq('usuario', cta.usuario);
+                if (error) { alert('Error al eliminar: ' + error.message); return; }
+                data.cuentas = data.cuentas.filter(c => c.usuario !== cta.usuario);
+                renderizar();
             }
         }
         // Nueva asignación
@@ -426,44 +757,30 @@
             const html = `
                 <div class="form-group"><label>Producto</label><select id="asig-producto">${opcionesProd}</select></div>
                 <div class="form-group"><label>Usuario</label><select id="asig-usuario">${opcionesUsr}</select></div>
-                <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="asig-encargado">${opcionesEnc}</select></div>
             `;
-            abrirModal('Nueva Asignación', html, () => {
-                data.asignaciones.push({
-                    id: data.nextIdAsignacion++,
-                    codigoProducto: obtenerValor('asig-producto'),
-                    dniUsuario: obtenerValor('asig-usuario'),
-                    fecha: obtenerValor('asig-fecha'),
-                    encargado: obtenerValor('asig-encargado'),
-                    estado: 'Activo'
-                });
-                guardar();
+            abrirModal('Nueva Asignación', html, async () => {
+                const nueva = { codigo_producto: obtenerValor('asig-producto'), dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo' };
+                const { data: fila, error } = await supabase.from('asignaciones').insert(nueva).select().single();
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                data.asignaciones.push(asignacionDesdeFila(fila));
             });
         }
-        // Botón QR
+        // QR de asignación activa (mismo QR permanente del producto)
         if (e.target.classList.contains('btn-qr')) {
-            const idAsig = parseInt(e.target.dataset.id);
-            const url = `${window.location.origin}${window.location.pathname.replace('dashboard.html','')}ver.html?id=${idAsig}`;
-            const modal = document.getElementById('modal');
-            const body = document.getElementById('modal-body');
-            body.innerHTML = `<h3>QR Asignación #${idAsig}</h3><div class="qr-container" id="qrcode"></div>
-                <p style="text-align:center; margin-top:1rem;"><a href="${url}" target="_blank">${url}</a></p>
-                <div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
-                <button class="btn btn-amarillo" id="btn-imprimir">Imprimir</button></div>`;
-            modal.style.display = 'flex';
-            const qrDiv = document.getElementById('qrcode'); qrDiv.innerHTML = '';
-            new QRCode(qrDiv, { text: url, width:220, height:220, colorDark:"#1E1E1E", colorLight:"#FFFFFF", correctLevel:QRCode.CorrectLevel.H });
-            document.getElementById('btn-imprimir').onclick = () => {
-                const win = window.open('','_blank');
-                win.document.write(`<html><head><title>QR</title></head><body style="text-align:center"><h2>TAKIPUKARA SAC</h2><img src="${qrDiv.querySelector('img').src}" style="width:250px"><p>${url}</p><script>window.print();<\/script></body></html>`);
-                win.document.close();
-            };
+            const codigo = e.target.dataset.codigo;
+            mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo));
         }
         // Devolver
         if (e.target.classList.contains('btn-devolver')) {
             const asig = data.asignaciones.find(a => a.id == e.target.dataset.id);
-            if (asig && confirm('¿Marcar como devuelto?')) { asig.estado = 'Devuelto'; guardar().then(renderizar); }
+            if (asig && confirm('¿Marcar como devuelto?')) {
+                const { error } = await supabase.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asig.id);
+                if (error) { alert('Error: ' + error.message); return; }
+                asig.estado = 'Devuelto';
+                renderizar();
+            }
         }
         // Reasignar
         if (e.target.classList.contains('btn-reasignar')) {
@@ -474,36 +791,31 @@
             const opcionesEnc = data.encargados.map(n => `<option>${n}</option>`).join('');
             const html = `<p>Producto: ${original.codigoProducto}</p>
                 <div class="form-group"><label>Nuevo Usuario</label><select id="reasig-usuario">${opcionesUsr}</select></div>
-                <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>`;
-            abrirModal('Reasignar Producto', html, () => {
-                data.asignaciones.push({
-                    id: data.nextIdAsignacion++,
-                    codigoProducto: original.codigoProducto,
-                    dniUsuario: obtenerValor('reasig-usuario'),
-                    fecha: obtenerValor('reasig-fecha'),
-                    encargado: obtenerValor('reasig-encargado'),
-                    estado: 'Activo'
-                });
-                guardar();
+            abrirModal('Reasignar Producto', html, async () => {
+                const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo' };
+                const { data: fila, error } = await supabase.from('asignaciones').insert(nueva).select().single();
+                if (error) { alert('Error al guardar: ' + error.message); return; }
+                data.asignaciones.push(asignacionDesdeFila(fila));
             });
         }
         // Eliminar asignación
         if (e.target.classList.contains('btn-eliminar-asig')) {
+            const id = e.target.dataset.id;
             if (confirm('¿Eliminar asignación?')) {
-                data.asignaciones = data.asignaciones.filter(a => a.id != e.target.dataset.id);
-                guardar().then(renderizar);
+                const { error } = await supabase.from('asignaciones').delete().eq('id', id);
+                if (error) { alert('Error al eliminar: ' + error.message); return; }
+                data.asignaciones = data.asignaciones.filter(a => a.id != id);
+                renderizar();
             }
         }
     });
 
     // Búsquedas en tiempo real
-    ['search-asignaciones','search-productos','search-usuarios'].forEach(id => {
+    ['search-asignaciones', 'search-productos', 'search-usuarios'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', renderizar);
     });
-
-    // Cargar datos al iniciar
-    cargarDatos();
 </script>
 </body>
 </html>
