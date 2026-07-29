@@ -55,7 +55,7 @@
                 document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Falta configurar Supabase en este archivo.</p></div>';
                 return;
             }
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             const urlParams = new URLSearchParams(window.location.search);
             const codigo = urlParams.get('codigo');
@@ -65,7 +65,7 @@
                 return;
             }
 
-            const { data: producto, error: errProd } = await supabase.from('productos').select('*').eq('codigo', codigo).maybeSingle();
+            const { data: producto, error: errProd } = await sb.from('productos').select('*').eq('codigo', codigo).maybeSingle();
             if (errProd) {
                 document.body.innerHTML = '<div class="tarjeta"><p class="mensaje">Error al cargar datos. Verifica tu conexión e intenta de nuevo.</p></div>';
                 return;
@@ -75,10 +75,10 @@
                 return;
             }
 
-            const { data: asignacion } = await supabase.from('asignaciones').select('*').eq('codigo_producto', codigo).eq('estado', 'Activo').maybeSingle();
+            const { data: asignacion } = await sb.from('asignaciones').select('*').eq('codigo_producto', codigo).eq('estado', 'Activo').maybeSingle();
             let usuario = null;
             if (asignacion) {
-                const { data: u } = await supabase.from('usuarios').select('*').eq('dni', asignacion.dni_usuario).maybeSingle();
+                const { data: u } = await sb.from('usuarios').select('*').eq('dni', asignacion.dni_usuario).maybeSingle();
                 usuario = u;
             }
 
