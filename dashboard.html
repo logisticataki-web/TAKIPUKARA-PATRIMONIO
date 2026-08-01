@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN - Panel de Gestión</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -192,7 +192,7 @@
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-usuarios">
-                        <thead><tr><th>Nombre</th><th>DNI</th><th>Área</th><th>Cargo</th><th>Acciones</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>DNI</th><th>Área</th><th>Cargo</th><th>Equipos Asignados</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -469,11 +469,15 @@
             const f = filtro.toLowerCase();
             lista = lista.filter(u => u.nombre.toLowerCase().includes(f) || u.dni.includes(f));
         }
-        tbody.innerHTML = lista.map(u => `<tr>
+        tbody.innerHTML = lista.map(u => {
+            const cantidad = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo').length;
+            return `<tr>
             <td>${u.nombre}</td><td>${u.dni}</td><td>${u.area}</td><td>${u.cargo}</td>
+            <td>${cantidad > 0 ? `<button class="btn btn-outline btn-sm btn-ver-equipos" data-dni="${u.dni}">${cantidad} equipo${cantidad === 1 ? '' : 's'}</button>` : '<span style="color:#888;">0 equipos</span>'}</td>
             <td><button class="btn btn-outline btn-sm btn-editar-usr" data-dni="${u.dni}">Editar</button>
                 <button class="btn btn-danger btn-sm btn-eliminar-usr" data-dni="${u.dni}">Eliminar</button></td>
-        </tr>`).join('');
+        </tr>`;
+        }).join('');
     }
 
     function renderizarCuentas() {
@@ -494,22 +498,90 @@
         else if (vistaActiva === 'view-cuentas') renderizarCuentas();
     }
 
-    // ---- EXPORTAR A EXCEL (.xlsx real, 3 hojas) ----
+    // ---- EXPORTAR A EXCEL CON DISEÑO PROFESIONAL ----
+    const ESTILO_TITULO = { font: { bold: true, sz: 16, color: { rgb: "1E1E1E" } }, fill: { fgColor: { rgb: "FFC107" } }, alignment: { horizontal: "center", vertical: "center" } };
+    const ESTILO_SUBTITULO = { font: { bold: true, sz: 11, color: { rgb: "1E1E1E" } }, alignment: { horizontal: "center" } };
+    const ESTILO_FECHA = { font: { italic: true, sz: 9, color: { rgb: "666666" } }, alignment: { horizontal: "center" } };
+    const ESTILO_ENCABEZADO = { font: { bold: true, sz: 10, color: { rgb: "FFC107" } }, fill: { fgColor: { rgb: "1E1E1E" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: { top: { style: "thin", color: { rgb: "999999" } }, bottom: { style: "thin", color: { rgb: "999999" } }, left: { style: "thin", color: { rgb: "999999" } }, right: { style: "thin", color: { rgb: "999999" } } } };
+    const ESTILO_CELDA = { font: { sz: 10 }, border: { top: { style: "thin", color: { rgb: "DDDDDD" } }, bottom: { style: "thin", color: { rgb: "DDDDDD" } }, left: { style: "thin", color: { rgb: "DDDDDD" } }, right: { style: "thin", color: { rgb: "DDDDDD" } } } };
+    const ESTILO_CELDA_ALT = { font: { sz: 10 }, fill: { fgColor: { rgb: "FFF8E1" } }, border: ESTILO_CELDA.border };
+    const ESTILO_TOTAL = { font: { bold: true, sz: 10, color: { rgb: "1E1E1E" } }, fill: { fgColor: { rgb: "FFC107" } }, border: ESTILO_CELDA.border };
+
+    function hojaConDiseno(titulo, encabezados, filas, anchoCols) {
+        const hoy = new Date().toLocaleDateString('es-PE');
+        const nCols = encabezados.length;
+        const aoa = [
+            ['TAKIPUKARA MINERÍA & CONSTRUCCIÓN', ...Array(nCols - 1).fill('')],
+            [titulo, ...Array(nCols - 1).fill('')],
+            [`Generado el ${hoy}`, ...Array(nCols - 1).fill('')],
+            [],
+            encabezados,
+            ...filas
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: nCols - 1 } }
+        ];
+        ws['!cols'] = anchoCols.map(w => ({ wch: w }));
+        ws['!rows'] = [{ hpt: 22 }, { hpt: 16 }, { hpt: 14 }];
+        ws['A1'].s = ESTILO_TITULO;
+        ws['A2'].s = ESTILO_SUBTITULO;
+        ws['A3'].s = ESTILO_FECHA;
+        for (let c = 0; c < nCols; c++) {
+            const ref = XLSX.utils.encode_cell({ r: 4, c });
+            if (ws[ref]) ws[ref].s = ESTILO_ENCABEZADO;
+        }
+        for (let r = 0; r < filas.length; r++) {
+            const estiloFila = r % 2 === 0 ? ESTILO_CELDA : ESTILO_CELDA_ALT;
+            for (let c = 0; c < nCols; c++) {
+                const ref = XLSX.utils.encode_cell({ r: 5 + r, c });
+                if (ws[ref]) ws[ref].s = estiloFila;
+            }
+        }
+        ws['!freeze'] = { xSplit: 0, ySplit: 5 };
+        return ws;
+    }
+
     function exportarExcel() {
-        const wsAsig = XLSX.utils.json_to_sheet(data.asignaciones.map(a => {
+        const wb = XLSX.utils.book_new();
+
+        // Hoja Resumen
+        const activos = data.asignaciones.filter(a => a.estado === 'Activo').length;
+        const disponibles = data.productos.filter(p => productoDisponible(p.codigo)).length;
+        const filasResumen = [
+            ['Total de productos registrados', data.productos.length],
+            ['Equipos actualmente asignados', activos],
+            ['Equipos disponibles en almacén', disponibles],
+            ['Total de personal registrado', data.usuarios.length],
+            ['Total de asignaciones históricas', data.asignaciones.length]
+        ];
+        const wsResumen = hojaConDiseno('RESUMEN GENERAL', ['Indicador', 'Valor'], filasResumen, [35, 15]);
+        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+        // Hoja Asignaciones
+        const filasAsig = data.asignaciones.map(a => {
             const prod = obtenerProducto(a.codigoProducto);
             const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
-            return { ID: a.id, 'Código Producto': prod?.codigo || '', Descripción: prod?.descripcion || '', Usuario: usr?.nombre || '', DNI: usr?.dni || '', Fecha: a.fecha, Estado: a.estado, Encargado: a.encargado };
-        }));
-        const wsProd = XLSX.utils.json_to_sheet(data.productos.map(p => ({
-            'Código': p.codigo, 'Descripción': p.descripcion, 'Marca': p.marca, 'Modelo': p.modelo,
-            'Nº Serie': p.numeroSerie, 'IMEI': p.imei || '', 'Color': p.color || '', 'Condición': p.condicion, 'Accesorios': p.accesorios || ''
-        })));
-        const wsUsr = XLSX.utils.json_to_sheet(data.usuarios.map(u => ({ Nombre: u.nombre, DNI: u.dni, 'Área': u.area, Cargo: u.cargo })));
-        const wb = XLSX.utils.book_new();
+            return [a.id, prod?.codigo || '', prod?.descripcion || '', usr?.nombre || '', usr?.dni || '', a.fecha, a.estado, a.encargado];
+        });
+        const wsAsig = hojaConDiseno('DETALLE DE ASIGNACIONES', ['ID', 'Código', 'Producto', 'Usuario', 'DNI', 'Fecha', 'Estado', 'Encargado'], filasAsig, [7, 12, 30, 25, 12, 12, 12, 20]);
         XLSX.utils.book_append_sheet(wb, wsAsig, 'Asignaciones');
+
+        // Hoja Productos
+        const filasProd = data.productos.map(p => [p.codigo, p.categoria || '', p.descripcion, p.marca, p.modelo, p.numeroSerie, p.imei || '', p.color || '', p.condicion, p.accesorios || '']);
+        const wsProd = hojaConDiseno('INVENTARIO DE PRODUCTOS', ['Código', 'Categoría', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'IMEI', 'Color', 'Condición', 'Accesorios'], filasProd, [12, 20, 28, 14, 16, 16, 14, 12, 12, 22]);
         XLSX.utils.book_append_sheet(wb, wsProd, 'Productos');
+
+        // Hoja Usuarios (con contador de equipos)
+        const filasUsr = data.usuarios.map(u => {
+            const cant = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo').length;
+            return [u.nombre, u.dni, u.area, u.cargo, cant];
+        });
+        const wsUsr = hojaConDiseno('PERSONAL Y EQUIPOS ASIGNADOS', ['Nombre', 'DNI', 'Área', 'Cargo', 'Equipos Asignados'], filasUsr, [30, 12, 18, 20, 16]);
         XLSX.utils.book_append_sheet(wb, wsUsr, 'Usuarios');
+
         XLSX.writeFile(wb, 'takipukara_' + new Date().toISOString().slice(0, 10) + '.xlsx');
     }
     document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
@@ -748,6 +820,22 @@
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.usuarios.push(nuevo);
             });
+        }
+        // Ver detalle de equipos asignados a un usuario
+        if (e.target.classList.contains('btn-ver-equipos')) {
+            const usr = data.usuarios.find(u => u.dni === e.target.dataset.dni);
+            if (!usr) return;
+            const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo');
+            const filas = equipos.map(a => {
+                const prod = obtenerProducto(a.codigoProducto);
+                return `<tr><td>${prod?.codigo || '???'}</td><td>${prod?.descripcion || ''}</td><td>${a.fecha}</td></tr>`;
+            }).join('');
+            const html = `<p style="margin-bottom:0.8rem; color:#555;">${usr.nombre} — ${usr.area} / ${usr.cargo}</p>
+                <table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table>`;
+            const modal = document.getElementById('modal');
+            const body = document.getElementById('modal-body');
+            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button></div>`;
+            modal.style.display = 'flex';
         }
         // Editar usuario
         if (e.target.classList.contains('btn-editar-usr')) {
