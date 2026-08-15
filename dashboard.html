@@ -188,7 +188,7 @@
                         <button class="btn btn-outline btn-sm" id="btn-plantilla-usr">📄 Plantilla</button>
                         <button class="btn btn-outline btn-sm" id="btn-importar-usr">📥 Importar Excel</button>
                         <input type="file" id="input-importar-usr" accept=".xlsx,.xls,.csv" style="display:none;">
-                        <button class="btn btn-outline btn-sm" id="btn-imprimir-qr-todos">🖨️ Imprimir Todos los QR</button>
+                        <button class="btn btn-outline btn-sm" id="btn-imprimir-qr-todos">📄 Exportar QR de Todos (Word)</button>
                         <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
                     </div>
                 </div>
@@ -414,40 +414,73 @@
     }
 
     // bloques: [{ titulo: 'Nombre — Área', items: [{codigo, descripcion, url}] }]
-    async function imprimirQRLote(bloques) {
-        let paginasHTML = '';
+    // bloques: [{ titulo: 'Nombre — Área', dni: '...', items: [{codigo, descripcion, fecha, url}] }]
+    // Genera un archivo Word (.doc): por cada persona, una hoja de "Cargo de Bienes" (lista en texto,
+    // para firmar) y luego la hoja de QR — en A5 si tiene 6 artículos o menos, o en A4 si tiene más.
+    async function exportarQRWord(bloques) {
+        let secciones = '';
+        let reglasPagina = '';
+        let contador = 0;
+
         for (const bloque of bloques) {
             const items = bloque.items;
-            for (let i = 0; i < items.length; i += 5) {
-                const grupo = items.slice(i, i + 5);
-                let filas = '';
-                for (const it of grupo) {
-                    const qrSrc = await generarQRDataURL(it.url);
-                    filas += `<div class="fila-qr">
-                        <img src="${qrSrc}" class="qr-img">
-                        <div class="qr-info"><strong>${it.codigo}</strong><br>${it.descripcion || ''}</div>
-                    </div>`;
-                }
-                paginasHTML += `<div class="pagina">
-                    <div class="encabezado-pagina"><strong>TAKIPUKARA</strong> MINERÍA &amp; CONSTRUCCIÓN<br><span class="persona">${bloque.titulo}</span></div>
-                    ${filas}
+
+            // ---- Sección: Cargo de bienes (lista de texto, A4) ----
+            contador++;
+            const secCargo = `Sec${contador}`;
+            reglasPagina += `@page ${secCargo} { size: 210mm 297mm; margin: 20mm; }\n`;
+            const filasCargo = items.map((it, i) => `<tr>
+                <td>${i + 1}</td><td>${it.codigo}</td><td>${it.descripcion || ''}</td><td>${it.fecha || ''}</td>
+            </tr>`).join('');
+            secciones += `<div style="page:${secCargo};">
+                <h2 style="text-align:center; color:#1E1E1E; margin-bottom:2px;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN</h2>
+                <h3 style="text-align:center; color:#555; margin-top:0;">CARGO DE BIENES — ${bloque.titulo}</h3>
+                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse; font-size:11pt; margin-top:14px;">
+                    <tr style="background:#1E1E1E; color:#FFC107;"><th>#</th><th>Código</th><th>Descripción</th><th>Fecha</th></tr>
+                    ${filasCargo}
+                </table>
+                <p style="text-align:right; font-weight:bold; margin-top:10px;">Total de artículos: ${items.length}</p>
+                <p style="margin-top:50px; text-align:center;">_______________________________<br>Firma del colaborador ${bloque.dni ? '— DNI: ' + bloque.dni : ''}</p>
+            </div>`;
+
+            // ---- Sección: hoja de QR (A5 si son 6 o menos, A4 si son más) ----
+            contador++;
+            const secQR = `Sec${contador}`;
+            const esA5 = items.length <= 6;
+            reglasPagina += esA5
+                ? `@page ${secQR} { size: 148mm 210mm; margin: 10mm; }\n`
+                : `@page ${secQR} { size: 210mm 297mm; margin: 15mm; }\n`;
+            let filasQR = '';
+            for (const it of items) {
+                const qrSrc = await generarQRDataURL(it.url);
+                const ancho = esA5 ? '105px' : '95px';
+                filasQR += `<div style="display:inline-block; width:${esA5 ? '46%' : '30%'}; text-align:center; margin:6px 1%; vertical-align:top;">
+                    <img src="${qrSrc}" style="width:${ancho}; height:${ancho};"><br>
+                    <span style="font-size:9.5pt;"><strong>${it.codigo}</strong><br>${it.descripcion || ''}</span>
                 </div>`;
             }
+            secciones += `<div style="page:${secQR};">
+                <h3 style="text-align:center; color:#1E1E1E; border-bottom:2px solid #FFC107; padding-bottom:6px;">TAKIPUKARA — ${bloque.titulo}</h3>
+                <div style="text-align:center;">${filasQR}</div>
+            </div>`;
         }
-        const win = window.open('', '_blank');
-        win.document.write(`<html><head><title>QR - TAKIPUKARA</title><style>
-            @page { size: A5; margin: 10mm; }
-            * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; }
-            .pagina { page-break-after: always; padding: 4mm; }
-            .pagina:last-child { page-break-after: auto; }
-            .encabezado-pagina { text-align:center; border-bottom:2px solid #FFC107; padding-bottom:8px; margin-bottom:14px; }
-            .persona { display:block; font-size:0.85rem; color:#555; margin-top:3px; }
-            .fila-qr { display:flex; align-items:center; gap:12px; margin-bottom:14px; border-bottom:1px dashed #ddd; padding-bottom:10px; }
-            .qr-img { width:85px; height:85px; flex-shrink:0; }
-            .qr-info { font-size:0.85rem; line-height:1.4; }
-        </style></head><body>${paginasHTML}<script>window.onload = () => window.print();<\/script></body></html>`);
-        win.document.close();
+
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset="utf-8"><title>QR TAKIPUKARA</title><style>
+            ${reglasPagina}
+            body { font-family: Calibri, Arial, sans-serif; }
+        </style></head>
+        <body>${secciones}</body></html>`;
+
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QR_TAKIPUKARA_${new Date().toISOString().slice(0, 10)}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     function mostrarQR(titulo, url) {
@@ -663,21 +696,20 @@
     }
     document.getElementById('btn-informe-personal').addEventListener('click', exportarInformePersonal);
 
-    // ---- IMPRIMIR TODOS LOS QR (TODO EL PERSONAL) ----
+    // ---- EXPORTAR QR DE TODO EL PERSONAL A WORD ----
     document.getElementById('btn-imprimir-qr-todos').addEventListener('click', async () => {
         const bloques = data.usuarios.map(u => {
             const equipos = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo');
             if (equipos.length === 0) return null;
             const items = equipos.map(a => {
                 const prod = obtenerProducto(a.codigoProducto);
-                return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', url: urlFichaProducto(a.codigoProducto) };
-            });
-            return { titulo: `${u.nombre} — ${u.area}`, items };
+                return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', fecha: a.fecha, url: urlFichaProducto(a.codigoProducto) };
+            }).sort((x, y) => x.codigo.localeCompare(y.codigo));
+            return { titulo: `${u.nombre} — ${u.area}`, dni: u.dni, items };
         }).filter(Boolean);
-        if (bloques.length === 0) { alert('No hay asignaciones activas para imprimir.'); return; }
-        const totalHojas = bloques.reduce((sum, b) => sum + Math.ceil(b.items.length / 5), 0);
-        if (!confirm(`Se generarán ${totalHojas} hoja(s) A5 para ${bloques.length} persona(s) con equipos asignados. ¿Continuar?`)) return;
-        await imprimirQRLote(bloques);
+        if (bloques.length === 0) { alert('No hay asignaciones activas para exportar.'); return; }
+        if (!confirm(`Se generará un Word con el cargo y los QR de ${bloques.length} persona(s) con equipos asignados. ¿Continuar?`)) return;
+        await exportarQRWord(bloques);
     });
 
     // ---- EXPORTAR REPORTE INDIVIDUAL DE UN USUARIO (cargo de bienes) ----
@@ -964,7 +996,8 @@
         if (e.target.classList.contains('btn-ver-equipos')) {
             const usr = data.usuarios.find(u => u.dni === e.target.dataset.dni);
             if (!usr) return;
-            const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo');
+            const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo')
+                .sort((a, b) => a.codigoProducto.localeCompare(b.codigoProducto));
             const filas = equipos.map(a => {
                 const prod = obtenerProducto(a.codigoProducto);
                 return `<tr><td>${prod?.codigo || '???'}</td><td>${prod?.descripcion || ''}</td><td>${a.fecha}</td></tr>`;
@@ -973,15 +1006,15 @@
                 <table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table>`;
             const modal = document.getElementById('modal');
             const body = document.getElementById('modal-body');
-            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">🖨️ Imprimir QR</button><button class="btn btn-amarillo" id="btn-exportar-usr-individual">📥 Exportar Excel</button></div>`;
+            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">📄 Exportar QR (Word)</button><button class="btn btn-amarillo" id="btn-exportar-usr-individual">📥 Exportar Excel</button></div>`;
             modal.style.display = 'flex';
             document.getElementById('btn-exportar-usr-individual').onclick = () => exportarReporteUsuario(usr, equipos);
             document.getElementById('btn-imprimir-qr-persona').onclick = () => {
                 const items = equipos.map(a => {
                     const prod = obtenerProducto(a.codigoProducto);
-                    return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', url: urlFichaProducto(a.codigoProducto) };
-                });
-                imprimirQRLote([{ titulo: `${usr.nombre} — ${usr.area}`, items }]);
+                    return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', fecha: a.fecha, url: urlFichaProducto(a.codigoProducto) };
+                }).sort((x, y) => x.codigo.localeCompare(y.codigo));
+                exportarQRWord([{ titulo: `${usr.nombre} — ${usr.area}`, dni: usr.dni, items }]);
             };
         }
         // Editar usuario
