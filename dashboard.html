@@ -137,6 +137,7 @@
         <div class="topbar-right">
             <button class="btn btn-outline" id="btn-refrescar">🔄 Actualizar</button>
             <button class="btn" style="background:var(--negro); color:var(--amarillo); border:2px solid var(--amarillo);" id="btn-exportar">📊 Exportar Excel</button>
+            <button class="btn btn-outline" id="btn-informe-personal">📋 Informe de Personal</button>
             <span style="color:#666;" id="reloj"></span>
             <span style="color:var(--negro); font-weight:600;" id="usuario-logueado"></span>
             <button class="btn btn-outline btn-sm" id="btn-logout">Salir</button>
@@ -187,6 +188,7 @@
                         <button class="btn btn-outline btn-sm" id="btn-plantilla-usr">📄 Plantilla</button>
                         <button class="btn btn-outline btn-sm" id="btn-importar-usr">📥 Importar Excel</button>
                         <input type="file" id="input-importar-usr" accept=".xlsx,.xls,.csv" style="display:none;">
+                        <button class="btn btn-outline btn-sm" id="btn-imprimir-qr-todos">🖨️ Imprimir Todos los QR</button>
                         <button class="btn btn-amarillo" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
                     </div>
                 </div>
@@ -237,7 +239,7 @@
 
     // ---- MAPEO fila de Supabase <-> objeto usado por la interfaz ----
     function productoDesdeFila(p) {
-        return { codigo: p.codigo, categoria: p.categoria || '', descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios };
+        return { codigo: p.codigo, categoria: p.categoria || '', descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios, moneda: p.moneda || 'PEN', precioUnitario: p.precio_unitario || 0 };
     }
     function asignacionDesdeFila(a) {
         return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado, urlVale: a.url_vale, urlFoto: a.url_foto };
@@ -394,6 +396,60 @@
     function urlFichaProducto(codigo) {
         return `${window.location.origin}${window.location.pathname.replace('dashboard.html', '')}ver.html?codigo=${encodeURIComponent(codigo)}`;
     }
+
+    // ---- IMPRESIÓN DE QR EN LOTE (A5, máx. 5 por hoja) ----
+    function generarQRDataURL(texto) {
+        return new Promise(resolve => {
+            const tmp = document.createElement('div');
+            tmp.style.display = 'none';
+            document.body.appendChild(tmp);
+            new QRCode(tmp, { text: texto, width: 200, height: 200, colorDark: "#1E1E1E", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.H });
+            setTimeout(() => {
+                const img = tmp.querySelector('img');
+                const src = img ? img.src : (tmp.querySelector('canvas') ? tmp.querySelector('canvas').toDataURL() : '');
+                document.body.removeChild(tmp);
+                resolve(src);
+            }, 60);
+        });
+    }
+
+    // bloques: [{ titulo: 'Nombre — Área', items: [{codigo, descripcion, url}] }]
+    async function imprimirQRLote(bloques) {
+        let paginasHTML = '';
+        for (const bloque of bloques) {
+            const items = bloque.items;
+            for (let i = 0; i < items.length; i += 5) {
+                const grupo = items.slice(i, i + 5);
+                let filas = '';
+                for (const it of grupo) {
+                    const qrSrc = await generarQRDataURL(it.url);
+                    filas += `<div class="fila-qr">
+                        <img src="${qrSrc}" class="qr-img">
+                        <div class="qr-info"><strong>${it.codigo}</strong><br>${it.descripcion || ''}</div>
+                    </div>`;
+                }
+                paginasHTML += `<div class="pagina">
+                    <div class="encabezado-pagina"><strong>TAKIPUKARA</strong> MINERÍA &amp; CONSTRUCCIÓN<br><span class="persona">${bloque.titulo}</span></div>
+                    ${filas}
+                </div>`;
+            }
+        }
+        const win = window.open('', '_blank');
+        win.document.write(`<html><head><title>QR - TAKIPUKARA</title><style>
+            @page { size: A5; margin: 10mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; }
+            .pagina { page-break-after: always; padding: 4mm; }
+            .pagina:last-child { page-break-after: auto; }
+            .encabezado-pagina { text-align:center; border-bottom:2px solid #FFC107; padding-bottom:8px; margin-bottom:14px; }
+            .persona { display:block; font-size:0.85rem; color:#555; margin-top:3px; }
+            .fila-qr { display:flex; align-items:center; gap:12px; margin-bottom:14px; border-bottom:1px dashed #ddd; padding-bottom:10px; }
+            .qr-img { width:85px; height:85px; flex-shrink:0; }
+            .qr-info { font-size:0.85rem; line-height:1.4; }
+        </style></head><body>${paginasHTML}<script>window.onload = () => window.print();<\/script></body></html>`);
+        win.document.close();
+    }
+
     function mostrarQR(titulo, url) {
         const modal = document.getElementById('modal');
         const body = document.getElementById('modal-body');
@@ -586,6 +642,75 @@
     }
     document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
 
+    // ---- INFORME DE PERSONAL: cantidad de artículos por cada persona ----
+    function exportarInformePersonal() {
+        const filas = data.usuarios
+            .map(u => {
+                const equipos = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo');
+                return { usuario: u, cantidad: equipos.length, equipos };
+            })
+            .sort((a, b) => b.cantidad - a.cantidad)
+            .map(x => [x.usuario.nombre, x.usuario.dni, x.usuario.area, x.usuario.cargo, x.cantidad, x.equipos.map(e => e.codigoProducto).join(', ')]);
+
+        const ws = hojaConDiseno(
+            'INFORME DE PERSONAL - CANTIDAD DE ARTÍCULOS ASIGNADOS',
+            ['Nombre', 'DNI', 'Área', 'Cargo', 'Cantidad de Artículos', 'Códigos Asignados'],
+            filas, [30, 12, 18, 20, 18, 35]
+        );
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Informe de Personal');
+        XLSX.writeFile(wb, 'informe_personal_takipukara_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    }
+    document.getElementById('btn-informe-personal').addEventListener('click', exportarInformePersonal);
+
+    // ---- IMPRIMIR TODOS LOS QR (TODO EL PERSONAL) ----
+    document.getElementById('btn-imprimir-qr-todos').addEventListener('click', async () => {
+        const bloques = data.usuarios.map(u => {
+            const equipos = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo');
+            if (equipos.length === 0) return null;
+            const items = equipos.map(a => {
+                const prod = obtenerProducto(a.codigoProducto);
+                return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', url: urlFichaProducto(a.codigoProducto) };
+            });
+            return { titulo: `${u.nombre} — ${u.area}`, items };
+        }).filter(Boolean);
+        if (bloques.length === 0) { alert('No hay asignaciones activas para imprimir.'); return; }
+        const totalHojas = bloques.reduce((sum, b) => sum + Math.ceil(b.items.length / 5), 0);
+        if (!confirm(`Se generarán ${totalHojas} hoja(s) A5 para ${bloques.length} persona(s) con equipos asignados. ¿Continuar?`)) return;
+        await imprimirQRLote(bloques);
+    });
+
+    // ---- EXPORTAR REPORTE INDIVIDUAL DE UN USUARIO (cargo de bienes) ----
+    function exportarReporteUsuario(usr, equipos) {
+        const wb = XLSX.utils.book_new();
+        const filas = equipos.map((a, i) => {
+            const prod = obtenerProducto(a.codigoProducto);
+            return [i + 1, prod?.codigo || '', prod?.descripcion || '', prod?.marca || '', prod?.modelo || '', prod?.numeroSerie || '', a.fecha, a.encargado];
+        });
+        const ws = hojaConDiseno(
+            `CARGO DE BIENES - ${usr.nombre.toUpperCase()}`,
+            ['Ítem', 'Código', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'Fecha de Entrega', 'Encargado'],
+            filas, [7, 12, 28, 14, 16, 16, 14, 20]
+        );
+        // Datos del colaborador debajo del encabezado
+        const filaDatos = 5 + filas.length + 2;
+        XLSX.utils.sheet_add_aoa(ws, [
+            ['Datos del colaborador'],
+            ['Nombre:', usr.nombre],
+            ['DNI:', usr.dni],
+            ['Área:', usr.area],
+            ['Cargo:', usr.cargo],
+            ['Total de equipos a su cargo:', equipos.length],
+            [],
+            ['_______________________________'],
+            ['Firma del colaborador']
+        ], { origin: `A${filaDatos}` });
+        if (ws[`A${filaDatos}`]) ws[`A${filaDatos}`].s = ESTILO_SUBTITULO;
+        XLSX.utils.book_append_sheet(wb, ws, 'Cargo de Bienes');
+        const nombreArchivo = `cargo_bienes_${usr.nombre.replace(/[^a-zA-Z0-9]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, nombreArchivo);
+    }
+
     // ---- PLANTILLA E IMPORTAR PRODUCTOS DESDE EXCEL ----
     document.getElementById('btn-plantilla').addEventListener('click', () => {
         const ejemplo = [{ 'Código': 'EJ-0001', 'Categoría': 'EQUIPOS DE COMPUTO', 'Descripción': 'Laptop Dell Latitude', 'Marca': 'Dell', 'Modelo': 'Latitude 5420', 'Nº Serie': 'ABC123456', 'IMEI': '', 'Color': 'Gris', 'Condición': 'Nuevo', 'Accesorios': 'Cargador, mochila' }];
@@ -613,6 +738,12 @@
                 if (!codigo) { sinCodigo++; return; }
                 if (data.productos.some(p => p.codigo === codigo) || vistos.has(codigo)) { yaEnPlanilla++; return; }
                 vistos.add(codigo);
+                const precioDolares = parseFloat(val(r, 'P.UNIT DOLARES', 'Precio Unitario ($)', 'PRECIO DOLARES').replace(',', '.')) || 0;
+                const precioSoles = parseFloat(val(r, 'P.UNIT SOLES', 'Precio Unitario (S/)', 'PRECIO SOLES', 'Precio Unitario').replace(',', '.')) || 0;
+                let moneda = 'PEN', precioUnitario = precioSoles;
+                if (precioDolares > 0) { moneda = 'USD'; precioUnitario = precioDolares; }
+                const monedaExplicita = val(r, 'Moneda', 'MONEDA', 'moneda');
+                if (monedaExplicita) moneda = monedaExplicita.toUpperCase().includes('USD') || monedaExplicita.toUpperCase().includes('DOLAR') ? 'USD' : 'PEN';
                 nuevos.push({
                     codigo,
                     categoria: val(r, 'Categoría', 'Categoria', 'CATEGORIA', 'CATEGORÍA'),
@@ -623,7 +754,8 @@
                     imei: val(r, 'IMEI', 'imei'),
                     color: val(r, 'Color', 'color', 'COLOR'),
                     condicion: val(r, 'Condición', 'Condicion', 'condición', 'CONDICION') || 'Nuevo',
-                    accesorios: val(r, 'Accesorios', 'accesorios', 'ACCESORIOS')
+                    accesorios: val(r, 'Accesorios', 'accesorios', 'ACCESORIOS'),
+                    moneda, precio_unitario: precioUnitario
                 });
             });
             let agregados = 0;
@@ -719,6 +851,8 @@
             <div class="form-group"><label>IMEI (opcional)</label><input type="text" id="prod-imei"></div>
             <div class="form-group"><label>Color</label><input type="text" id="prod-color"></div>
             <div class="form-group"><label>Condición</label><select id="prod-condicion"><option>Nuevo</option><option>Usado</option><option>Reparado</option><option>Reacondicionado</option></select></div>
+            <div class="form-group"><label>Moneda</label><select id="prod-moneda"><option value="PEN">Soles (S/)</option><option value="USD">Dólares ($)</option></select></div>
+            <div class="form-group"><label>Precio unitario</label><input type="number" id="prod-precio" step="0.01" min="0" value="0"></div>
             <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios" rows="2"></textarea></div>
         `;
         abrirModal('Nuevo Producto', html, async () => {
@@ -728,11 +862,13 @@
                 codigo, categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
                 modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
                 imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
-                condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios')
+                condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios'),
+                moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0
             };
             const { error } = await sb.from('productos').insert({
                 codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
-                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios
+                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios,
+                moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario
             });
             if (error) { alert('Error al guardar: ' + error.message); return; }
             data.productos.push(nuevo);
@@ -775,14 +911,17 @@
                 <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei" value="${prod.imei || ''}"></div>
                 <div class="form-group"><label>Color</label><input type="text" id="prod-color" value="${prod.color || ''}"></div>
                 <div class="form-group"><label>Condición</label><select id="prod-condicion">${['Nuevo', 'Usado', 'Reparado', 'Reacondicionado'].map(o => `<option ${prod.condicion === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+                <div class="form-group"><label>Moneda</label><select id="prod-moneda"><option value="PEN" ${(prod.moneda || 'PEN') === 'PEN' ? 'selected' : ''}>Soles (S/)</option><option value="USD" ${prod.moneda === 'USD' ? 'selected' : ''}>Dólares ($)</option></select></div>
+                <div class="form-group"><label>Precio unitario</label><input type="number" id="prod-precio" step="0.01" min="0" value="${prod.precioUnitario || 0}"></div>
                 <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios || ''}</textarea></div>
             `;
             abrirModal('Editar Producto', html, async () => {
-                const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios') };
+                const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios'), moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0 };
                 const { error } = await sb.from('productos').update({
                     categoria: cambios.categoria, descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
                     numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
-                    condicion: cambios.condicion, accesorios: cambios.accesorios
+                    condicion: cambios.condicion, accesorios: cambios.accesorios,
+                    moneda: cambios.moneda, precio_unitario: cambios.precioUnitario
                 }).eq('codigo', prod.codigo);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 Object.assign(prod, cambios);
@@ -834,8 +973,16 @@
                 <table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table>`;
             const modal = document.getElementById('modal');
             const body = document.getElementById('modal-body');
-            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button></div>`;
+            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">🖨️ Imprimir QR</button><button class="btn btn-amarillo" id="btn-exportar-usr-individual">📥 Exportar Excel</button></div>`;
             modal.style.display = 'flex';
+            document.getElementById('btn-exportar-usr-individual').onclick = () => exportarReporteUsuario(usr, equipos);
+            document.getElementById('btn-imprimir-qr-persona').onclick = () => {
+                const items = equipos.map(a => {
+                    const prod = obtenerProducto(a.codigoProducto);
+                    return { codigo: a.codigoProducto, descripcion: prod?.descripcion || '', url: urlFichaProducto(a.codigoProducto) };
+                });
+                imprimirQRLote([{ titulo: `${usr.nombre} — ${usr.area}`, items }]);
+            };
         }
         // Editar usuario
         if (e.target.classList.contains('btn-editar-usr')) {
