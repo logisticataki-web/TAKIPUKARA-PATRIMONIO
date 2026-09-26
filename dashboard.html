@@ -7,7 +7,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         :root {
             --amarillo: #FFC107;
@@ -1315,9 +1314,29 @@
         panel.style.display = 'block';
     });
 
+    let html5QrcodeLibCargada = false;
+    function cargarLibreriaEscaneo() {
+        return new Promise((resolve, reject) => {
+            if (html5QrcodeLibCargada || window.Html5Qrcode) { html5QrcodeLibCargada = true; resolve(); return; }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+            script.onload = () => { html5QrcodeLibCargada = true; resolve(); };
+            script.onerror = () => reject(new Error('No se pudo cargar la librería de escaneo. Revisa tu conexión a internet.'));
+            document.head.appendChild(script);
+        });
+    }
+
     document.getElementById('btn-iniciar-escaner').addEventListener('click', async () => {
         if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
         const estado = document.getElementById('escaner-estado');
+        estado.textContent = 'Cargando el lector de cámara...';
+        try {
+            await cargarLibreriaEscaneo();
+        } catch (e) {
+            alert(e.message);
+            estado.textContent = '';
+            return;
+        }
         html5QrCodeInstance = new Html5Qrcode('lector-qr');
         const formatos = [
             Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
