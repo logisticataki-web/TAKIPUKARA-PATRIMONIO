@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         :root {
             --amarillo: #FFC107;
@@ -124,6 +125,7 @@
     </div>
     <nav>
         <button class="nav-btn active" data-view="asignaciones">🏷️ Asignaciones</button>
+        <button class="nav-btn" data-view="escanear">📷 Escanear</button>
         <button class="nav-btn" data-view="productos">📦 Productos</button>
         <button class="nav-btn" data-view="usuarios">👥 Usuarios</button>
         <button class="nav-btn" data-view="cuentas" id="nav-cuentas" style="display:none;">🔐 Cuentas</button>
@@ -159,6 +161,36 @@
                 </div>
             </div>
         </div>
+        <!-- Vista Escanear -->
+        <div id="view-escanear" class="view hidden">
+            <div class="card">
+                <div class="form-group">
+                    <label>1. Selecciona al colaborador que va a recibir</label>
+                    <select id="escaner-usuario">
+                        <option value="">-- Selecciona un colaborador --</option>
+                    </select>
+                </div>
+                <div id="escaner-panel" style="display:none;">
+                    <div class="toolbar" style="margin-top:1rem;">
+                        <button class="btn btn-amarillo" id="btn-iniciar-escaner">📷 Iniciar cámara</button>
+                        <button class="btn btn-outline" id="btn-detener-escaner" style="display:none;">⏹️ Detener cámara</button>
+                        <button class="btn btn-outline" id="btn-mueble-sin-serie">➕ Registrar mueble sin número de serie</button>
+                    </div>
+                    <div id="lector-qr" style="width:100%; max-width:400px; margin:1rem auto;"></div>
+                    <p id="escaner-estado" style="text-align:center; color:#666;"></p>
+                    <div class="card" style="background:#FFF8E1; margin-top:1rem;">
+                        <h3 style="margin-bottom:0.6rem;">Entregado en esta sesión a <span id="escaner-nombre-usuario"></span></h3>
+                        <table style="width:100%;">
+                            <thead><tr><th>Código</th><th>Descripción</th><th>Hora</th></tr></thead>
+                            <tbody id="escaner-tabla-sesion"></tbody>
+                        </table>
+                        <div class="flex-end" style="margin-top:1rem;">
+                            <button class="btn btn-amarillo" id="btn-generar-cargo-escaner">📋 Generar Cargo de Bienes (Word)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Vista Productos -->
         <div id="view-productos" class="view hidden">
             <div class="card">
@@ -168,12 +200,14 @@
                         <button class="btn btn-outline btn-sm" id="btn-plantilla">📄 Plantilla</button>
                         <button class="btn btn-outline btn-sm" id="btn-importar">📥 Importar Excel</button>
                         <input type="file" id="input-importar" accept=".xlsx,.xls,.csv" style="display:none;">
+                        <button class="btn btn-outline btn-sm" id="btn-qr-disponibles">📄 QR de Disponibles (Word)</button>
+                        <button class="btn btn-outline btn-sm" id="btn-qr-seleccionados">📄 QR Seleccionados (Word)</button>
                         <button class="btn btn-amarillo" id="btn-nuevo-producto">+ Nuevo Producto</button>
                     </div>
                 </div>
                 <div class="table-wrapper">
                     <table id="tabla-productos">
-                        <thead><tr><th>Código</th><th>Categoría</th><th>Descripción</th><th>Marca</th><th>Modelo</th><th>Nº Serie</th><th>IMEI</th><th>Color</th><th>Condición</th><th>Accesorios</th><th>Acciones</th></tr></thead>
+                        <thead><tr><th><input type="checkbox" id="check-todos-productos"></th><th>Código</th><th>Categoría</th><th>Descripción</th><th>Marca</th><th>Modelo</th><th>Nº Serie</th><th>IMEI</th><th>Color</th><th>Condición</th><th>Accesorios</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -239,10 +273,10 @@
 
     // ---- MAPEO fila de Supabase <-> objeto usado por la interfaz ----
     function productoDesdeFila(p) {
-        return { codigo: p.codigo, categoria: p.categoria || '', descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, accesorios: p.accesorios, moneda: p.moneda || 'PEN', precioUnitario: p.precio_unitario || 0 };
+        return { codigo: p.codigo, categoria: p.categoria || '', descripcion: p.descripcion, marca: p.marca, modelo: p.modelo, numeroSerie: p.numero_serie, imei: p.imei, color: p.color, condicion: p.condicion, estadoFuncional: p.estado_funcional || 'Operativo', accesorios: p.accesorios, moneda: p.moneda || 'PEN', precioUnitario: p.precio_unitario || 0 };
     }
     function asignacionDesdeFila(a) {
-        return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado, urlVale: a.url_vale, urlFoto: a.url_foto };
+        return { id: a.id, codigoProducto: a.codigo_producto, dniUsuario: a.dni_usuario, fecha: a.fecha, encargado: a.encargado, estado: a.estado, observaciones: a.observaciones || '', urlVale: a.url_vale, urlFoto: a.url_foto };
     }
     // ---- EVIDENCIA (subida de archivos a Supabase Storage) ----
     async function subirEvidencia(file, prefijo) {
@@ -269,7 +303,7 @@
             return false;
         }
         data.productos = prod.data.map(productoDesdeFila);
-        data.usuarios = usr.data.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo }));
+        data.usuarios = usr.data.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo, ceco: u.ceco || '' }));
         data.asignaciones = asig.data.map(asignacionDesdeFila);
         data.encargados = enc.data.map(e => e.nombre);
         if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
@@ -360,7 +394,7 @@
     const navBtns = document.querySelectorAll('.nav-btn');
     const views = document.querySelectorAll('.view');
     const viewTitle = document.getElementById('view-title');
-    const titulos = { asignaciones: 'Asignaciones', productos: 'Productos', usuarios: 'Usuarios', cuentas: 'Cuentas del Sistema' };
+    const titulos = { asignaciones: 'Asignaciones', escanear: 'Escanear y Entregar', productos: 'Productos', usuarios: 'Usuarios', cuentas: 'Cuentas del Sistema' };
     navBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             navBtns.forEach(b => b.classList.remove('active'));
@@ -417,7 +451,8 @@
     // bloques: [{ titulo: 'Nombre — Área', dni: '...', items: [{codigo, descripcion, fecha, url}] }]
     // Genera un archivo Word (.doc): por cada persona, una hoja de "Cargo de Bienes" (lista en texto,
     // para firmar) y luego la hoja de QR — en A5 si tiene 6 artículos o menos, o en A4 si tiene más.
-    async function exportarQRWord(bloques) {
+    async function exportarQRWord(bloques, opciones = {}) {
+        const incluirCargo = opciones.incluirCargo !== false;
         let secciones = '';
         let reglasPagina = '';
         let contador = 0;
@@ -425,23 +460,25 @@
         for (const bloque of bloques) {
             const items = bloque.items;
 
-            // ---- Sección: Cargo de bienes (lista de texto, A4) ----
-            contador++;
-            const secCargo = `Sec${contador}`;
-            reglasPagina += `@page ${secCargo} { size: 210mm 297mm; margin: 20mm; }\n`;
-            const filasCargo = items.map((it, i) => `<tr>
-                <td>${i + 1}</td><td>${it.codigo}</td><td>${it.descripcion || ''}</td><td>${it.fecha || ''}</td>
-            </tr>`).join('');
-            secciones += `<div style="page:${secCargo};">
-                <h2 style="text-align:center; color:#1E1E1E; margin-bottom:2px;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN</h2>
-                <h3 style="text-align:center; color:#555; margin-top:0;">CARGO DE BIENES — ${bloque.titulo}</h3>
-                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse; font-size:11pt; margin-top:14px;">
-                    <tr style="background:#1E1E1E; color:#FFC107;"><th>#</th><th>Código</th><th>Descripción</th><th>Fecha</th></tr>
-                    ${filasCargo}
-                </table>
-                <p style="text-align:right; font-weight:bold; margin-top:10px;">Total de artículos: ${items.length}</p>
-                <p style="margin-top:50px; text-align:center;">_______________________________<br>Firma del colaborador ${bloque.dni ? '— DNI: ' + bloque.dni : ''}</p>
-            </div>`;
+            // ---- Sección: Cargo de bienes (lista de texto, A4) — solo si hay usuario asignado ----
+            if (incluirCargo) {
+                contador++;
+                const secCargo = `Sec${contador}`;
+                reglasPagina += `@page ${secCargo} { size: 210mm 297mm; margin: 20mm; }\n`;
+                const filasCargo = items.map((it, i) => `<tr>
+                    <td>${i + 1}</td><td>${it.codigo}</td><td>${it.descripcion || ''}</td><td>${it.fecha || ''}</td>
+                </tr>`).join('');
+                secciones += `<div style="page:${secCargo};">
+                    <h2 style="text-align:center; color:#1E1E1E; margin-bottom:2px;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN</h2>
+                    <h3 style="text-align:center; color:#555; margin-top:0;">CARGO DE BIENES — ${bloque.titulo}</h3>
+                    <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse; font-size:11pt; margin-top:14px;">
+                        <tr style="background:#1E1E1E; color:#FFC107;"><th>#</th><th>Código</th><th>Descripción</th><th>Fecha</th></tr>
+                        ${filasCargo}
+                    </table>
+                    <p style="text-align:right; font-weight:bold; margin-top:10px;">Total de artículos: ${items.length}</p>
+                    <p style="margin-top:50px; text-align:center;">_______________________________<br>Firma del colaborador ${bloque.dni ? '— DNI: ' + bloque.dni : ''}</p>
+                </div>`;
+            }
 
             // ---- Sección: hoja de QR (A5 si son 6 o menos, A4 si son más) ----
             contador++;
@@ -534,6 +571,8 @@
         }).join('');
     }
 
+    const productosSeleccionados = new Set();
+
     function renderizarProductos(filtro = '') {
         const tbody = document.querySelector('#tabla-productos tbody');
         let lista = data.productos;
@@ -542,6 +581,7 @@
             lista = lista.filter(p => p.codigo.toLowerCase().includes(f) || p.descripcion.toLowerCase().includes(f) || p.marca.toLowerCase().includes(f) || (p.categoria || '').toLowerCase().includes(f));
         }
         tbody.innerHTML = lista.map(p => `<tr>
+            <td><input type="checkbox" class="check-producto" data-codigo="${p.codigo}" ${productosSeleccionados.has(p.codigo) ? 'checked' : ''}></td>
             <td>${p.codigo}</td><td>${p.categoria || '-'}</td><td>${p.descripcion}</td><td>${p.marca}</td><td>${p.modelo}</td>
             <td>${p.numeroSerie}</td><td>${p.imei || '-'}</td><td>${p.color || '-'}</td><td>${p.condicion}</td>
             <td>${p.accesorios || '-'}</td>
@@ -585,6 +625,15 @@
         else if (vistaActiva === 'view-productos') renderizarProductos(document.getElementById('search-productos')?.value || '');
         else if (vistaActiva === 'view-usuarios') renderizarUsuarios(document.getElementById('search-usuarios')?.value || '');
         else if (vistaActiva === 'view-cuentas') renderizarCuentas();
+        else if (vistaActiva === 'view-escanear') renderizarEscanear();
+    }
+
+    function renderizarEscanear() {
+        const select = document.getElementById('escaner-usuario');
+        const valorActual = select.value;
+        select.innerHTML = '<option value="">-- Selecciona un colaborador --</option>' +
+            data.usuarios.map(u => `<option value="${u.dni}">${u.nombre} — ${u.area}</option>`).join('');
+        if (valorActual) select.value = valorActual;
     }
 
     // ---- EXPORTAR A EXCEL CON DISEÑO PROFESIONAL ----
@@ -753,6 +802,46 @@
     });
 
     document.getElementById('btn-importar').addEventListener('click', () => document.getElementById('input-importar').click());
+
+    // ---- Selección de productos con checkbox ----
+    document.getElementById('tabla-productos').addEventListener('change', e => {
+        if (e.target.classList.contains('check-producto')) {
+            const codigo = e.target.dataset.codigo;
+            if (e.target.checked) productosSeleccionados.add(codigo);
+            else productosSeleccionados.delete(codigo);
+        }
+    });
+    document.getElementById('check-todos-productos').addEventListener('change', e => {
+        document.querySelectorAll('#tabla-productos .check-producto').forEach(chk => {
+            chk.checked = e.target.checked;
+            if (e.target.checked) productosSeleccionados.add(chk.dataset.codigo);
+            else productosSeleccionados.delete(chk.dataset.codigo);
+        });
+    });
+
+    function itemsDeProductos(lista) {
+        return lista.map(p => ({ codigo: p.codigo, descripcion: p.descripcion, url: urlFichaProducto(p.codigo) }))
+            .sort((x, y) => x.codigo.localeCompare(y.codigo));
+    }
+
+    // ---- Exportar QR de todos los productos disponibles (sin asignar) ----
+    document.getElementById('btn-qr-disponibles').addEventListener('click', async () => {
+        const disponibles = data.productos.filter(p => productoDisponible(p.codigo));
+        if (disponibles.length === 0) { alert('No hay productos disponibles sin asignar.'); return; }
+        if (!confirm(`Se generará un Word con los QR de ${disponibles.length} producto(s) disponibles. ¿Continuar?`)) return;
+        const items = itemsDeProductos(disponibles);
+        await exportarQRWord([{ titulo: 'Productos Disponibles (Sin Asignar)', items }], { incluirCargo: false });
+    });
+
+    // ---- Exportar QR de los productos marcados con checkbox ----
+    document.getElementById('btn-qr-seleccionados').addEventListener('click', async () => {
+        if (productosSeleccionados.size === 0) { alert('Marca al menos un producto con el checkbox de la primera columna.'); return; }
+        const seleccionados = data.productos.filter(p => productosSeleccionados.has(p.codigo));
+        if (!confirm(`Se generará un Word con los QR de ${seleccionados.length} producto(s) seleccionados. ¿Continuar?`)) return;
+        const items = itemsDeProductos(seleccionados);
+        await exportarQRWord([{ titulo: 'Productos Seleccionados', items }], { incluirCargo: false });
+    });
+
     document.getElementById('input-importar').addEventListener('change', async e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -883,6 +972,7 @@
             <div class="form-group"><label>IMEI (opcional)</label><input type="text" id="prod-imei"></div>
             <div class="form-group"><label>Color</label><input type="text" id="prod-color"></div>
             <div class="form-group"><label>Condición</label><select id="prod-condicion"><option>Nuevo</option><option>Usado</option><option>Reparado</option><option>Reacondicionado</option></select></div>
+            <div class="form-group"><label>Estado Funcional</label><select id="prod-estado-funcional"><option>Operativo</option><option>No Operativo</option><option>En Reparación</option></select></div>
             <div class="form-group"><label>Moneda</label><select id="prod-moneda"><option value="PEN">Soles (S/)</option><option value="USD">Dólares ($)</option></select></div>
             <div class="form-group"><label>Precio unitario</label><input type="number" id="prod-precio" step="0.01" min="0" value="0"></div>
             <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios" rows="2"></textarea></div>
@@ -894,12 +984,12 @@
                 codigo, categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
                 modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
                 imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
-                condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios'),
+                condicion: obtenerValor('prod-condicion'), estadoFuncional: obtenerValor('prod-estado-funcional'), accesorios: obtenerValor('prod-accesorios'),
                 moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0
             };
             const { error } = await sb.from('productos').insert({
                 codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
-                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, accesorios: nuevo.accesorios,
+                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios,
                 moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario
             });
             if (error) { alert('Error al guardar: ' + error.message); return; }
@@ -943,16 +1033,17 @@
                 <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei" value="${prod.imei || ''}"></div>
                 <div class="form-group"><label>Color</label><input type="text" id="prod-color" value="${prod.color || ''}"></div>
                 <div class="form-group"><label>Condición</label><select id="prod-condicion">${['Nuevo', 'Usado', 'Reparado', 'Reacondicionado'].map(o => `<option ${prod.condicion === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+                <div class="form-group"><label>Estado Funcional</label><select id="prod-estado-funcional">${['Operativo', 'No Operativo', 'En Reparación'].map(o => `<option ${prod.estadoFuncional === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
                 <div class="form-group"><label>Moneda</label><select id="prod-moneda"><option value="PEN" ${(prod.moneda || 'PEN') === 'PEN' ? 'selected' : ''}>Soles (S/)</option><option value="USD" ${prod.moneda === 'USD' ? 'selected' : ''}>Dólares ($)</option></select></div>
                 <div class="form-group"><label>Precio unitario</label><input type="number" id="prod-precio" step="0.01" min="0" value="${prod.precioUnitario || 0}"></div>
                 <div class="form-group"><label>Accesorios</label><textarea id="prod-accesorios">${prod.accesorios || ''}</textarea></div>
             `;
             abrirModal('Editar Producto', html, async () => {
-                const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), accesorios: obtenerValor('prod-accesorios'), moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0 };
+                const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), estadoFuncional: obtenerValor('prod-estado-funcional'), accesorios: obtenerValor('prod-accesorios'), moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0 };
                 const { error } = await sb.from('productos').update({
                     categoria: cambios.categoria, descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
                     numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
-                    condicion: cambios.condicion, accesorios: cambios.accesorios,
+                    condicion: cambios.condicion, estado_funcional: cambios.estadoFuncional, accesorios: cambios.accesorios,
                     moneda: cambios.moneda, precio_unitario: cambios.precioUnitario
                 }).eq('codigo', prod.codigo);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
@@ -982,11 +1073,12 @@
                 <div class="form-group"><label>DNI *</label><input type="text" id="usr-dni"></div>
                 <div class="form-group"><label>Área *</label><input type="text" id="usr-area"></div>
                 <div class="form-group"><label>Cargo *</label><input type="text" id="usr-cargo"></div>
+                <div class="form-group"><label>CeCo (Centro de Costo)</label><input type="text" id="usr-ceco"></div>
             `;
             abrirModal('Nuevo Usuario', html, async () => {
                 const dni = obtenerValor('usr-dni');
                 if (data.usuarios.some(u => u.dni === dni)) { alert('DNI ya existe'); return; }
-                const nuevo = { nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
+                const nuevo = { nombre: obtenerValor('usr-nombre'), dni, area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo'), ceco: obtenerValor('usr-ceco') };
                 const { error } = await sb.from('usuarios').insert(nuevo);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.usuarios.push(nuevo);
@@ -1006,9 +1098,10 @@
                 <table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table>`;
             const modal = document.getElementById('modal');
             const body = document.getElementById('modal-body');
-            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">📄 Exportar QR (Word)</button><button class="btn btn-amarillo" id="btn-exportar-usr-individual">📥 Exportar Excel</button></div>`;
+            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">📄 Exportar QR (Word)</button><button class="btn btn-outline" id="btn-exportar-usr-individual">📥 Exportar Excel</button><button class="btn btn-amarillo" id="btn-cargo-patrimonio">📋 Generar Cargo de Bienes</button></div>`;
             modal.style.display = 'flex';
             document.getElementById('btn-exportar-usr-individual').onclick = () => exportarReporteUsuario(usr, equipos);
+            document.getElementById('btn-cargo-patrimonio').onclick = () => generarCargoPatrimonio(usr);
             document.getElementById('btn-imprimir-qr-persona').onclick = () => {
                 const items = equipos.map(a => {
                     const prod = obtenerProducto(a.codigoProducto);
@@ -1026,9 +1119,10 @@
                 <div class="form-group"><label>Nombre</label><input type="text" id="usr-nombre" value="${usr.nombre}"></div>
                 <div class="form-group"><label>Área</label><input type="text" id="usr-area" value="${usr.area}"></div>
                 <div class="form-group"><label>Cargo</label><input type="text" id="usr-cargo" value="${usr.cargo}"></div>
+                <div class="form-group"><label>CeCo (Centro de Costo)</label><input type="text" id="usr-ceco" value="${usr.ceco || ''}"></div>
             `;
             abrirModal('Editar Usuario', html, async () => {
-                const cambios = { nombre: obtenerValor('usr-nombre'), area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo') };
+                const cambios = { nombre: obtenerValor('usr-nombre'), area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo'), ceco: obtenerValor('usr-ceco') };
                 const { error } = await sb.from('usuarios').update(cambios).eq('dni', usr.dni);
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 Object.assign(usr, cambios);
@@ -1089,6 +1183,7 @@
                 <div class="form-group"><label>Usuario</label><select id="asig-usuario">${opcionesUsr}</select></div>
                 <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="asig-encargado">${opcionesEnc}</select></div>
+                <div class="form-group"><label>Observaciones</label><textarea id="asig-observaciones" rows="2" placeholder="Ej: Incluye maletín porta laptop"></textarea></div>
                 <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="asig-vale" accept="image/*,.pdf"></div>
                 <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="asig-foto" accept="image/*" capture="environment"></div>
             `;
@@ -1098,7 +1193,7 @@
                 const archivoFoto = document.getElementById('asig-foto').files[0];
                 const urlVale = await subirEvidencia(archivoVale, `vale_${codigoProd}`);
                 const urlFoto = await subirEvidencia(archivoFoto, `foto_${codigoProd}`);
-                const nueva = { codigo_producto: codigoProd, dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo', url_vale: urlVale, url_foto: urlFoto };
+                const nueva = { codigo_producto: codigoProd, dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo', observaciones: obtenerValor('asig-observaciones'), url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
@@ -1130,6 +1225,7 @@
                 <div class="form-group"><label>Nuevo Usuario</label><select id="reasig-usuario">${opcionesUsr}</select></div>
                 <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>
+                <div class="form-group"><label>Observaciones</label><textarea id="reasig-observaciones" rows="2"></textarea></div>
                 <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="reasig-vale" accept="image/*,.pdf"></div>
                 <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="reasig-foto" accept="image/*" capture="environment"></div>`;
             abrirModal('Reasignar Producto', html, async () => {
@@ -1137,7 +1233,7 @@
                 const archivoFoto = document.getElementById('reasig-foto').files[0];
                 const urlVale = await subirEvidencia(archivoVale, `vale_${original.codigoProducto}`);
                 const urlFoto = await subirEvidencia(archivoFoto, `foto_${original.codigoProducto}`);
-                const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo', url_vale: urlVale, url_foto: urlFoto };
+                const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo', observaciones: obtenerValor('reasig-observaciones'), url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error al guardar: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
@@ -1182,6 +1278,274 @@
     ['search-asignaciones', 'search-productos', 'search-usuarios'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', renderizar);
     });
+
+    // ==================== NUMERACIÓN AUTOMÁTICA ====================
+    async function siguienteNumero(nombre) {
+        const { data: n, error } = await sb.rpc('siguiente_numero', { p_nombre: nombre });
+        if (error) { console.error(error); return null; }
+        return n;
+    }
+
+    function logoDataURL() {
+        try {
+            const img = document.querySelector('.logo-container img');
+            if (!img || !img.complete || img.naturalWidth === 0) return '';
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            return canvas.toDataURL('image/png');
+        } catch (e) { return ''; }
+    }
+
+    // ==================== ESCANEAR Y ENTREGAR ====================
+    let sesionEscaneo = { usuario: null, items: [] };
+    let html5QrCodeInstance = null;
+    let ultimoCodigoEscaneado = null;
+    let ultimoTiempoEscaneado = 0;
+
+    document.getElementById('escaner-usuario').addEventListener('change', () => {
+        const dni = document.getElementById('escaner-usuario').value;
+        const panel = document.getElementById('escaner-panel');
+        if (!dni) { panel.style.display = 'none'; return; }
+        const usr = data.usuarios.find(u => u.dni === dni);
+        sesionEscaneo = { usuario: usr, items: [] };
+        document.getElementById('escaner-nombre-usuario').textContent = usr.nombre;
+        document.getElementById('escaner-tabla-sesion').innerHTML = '';
+        document.getElementById('escaner-estado').textContent = '';
+        panel.style.display = 'block';
+    });
+
+    document.getElementById('btn-iniciar-escaner').addEventListener('click', async () => {
+        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+        const estado = document.getElementById('escaner-estado');
+        html5QrCodeInstance = new Html5Qrcode('lector-qr');
+        const formatos = [
+            Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E
+        ];
+        try {
+            await html5QrCodeInstance.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: { width: 250, height: 150 }, formatsToSupport: formatos },
+                onCodigoEscaneado,
+                () => { /* ignorar errores de lectura silenciosos */ }
+            );
+            document.getElementById('btn-iniciar-escaner').style.display = 'none';
+            document.getElementById('btn-detener-escaner').style.display = 'inline-block';
+            estado.textContent = 'Cámara activa — apunta al código de barras o QR del equipo.';
+        } catch (e) {
+            alert('No se pudo iniciar la cámara. Verifica los permisos del navegador. Detalle: ' + e);
+        }
+    });
+
+    document.getElementById('btn-detener-escaner').addEventListener('click', async () => {
+        if (html5QrCodeInstance) {
+            try { await html5QrCodeInstance.stop(); html5QrCodeInstance.clear(); } catch (e) { /* ya estaba detenida */ }
+        }
+        document.getElementById('btn-iniciar-escaner').style.display = 'inline-block';
+        document.getElementById('btn-detener-escaner').style.display = 'none';
+        document.getElementById('escaner-estado').textContent = '';
+    });
+
+    async function crearAsignacionDesdeEscaner(prod) {
+        const nueva = { codigo_producto: prod.codigo, dni_usuario: sesionEscaneo.usuario.dni, fecha: new Date().toISOString().slice(0, 10), encargado: sesion.nombre, estado: 'Activo', observaciones: '' };
+        const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
+        if (error) { alert('Error al asignar: ' + error.message); return; }
+        data.asignaciones.push(asignacionDesdeFila(fila));
+        const hora = new Date().toLocaleTimeString('es-PE');
+        const tbody = document.getElementById('escaner-tabla-sesion');
+        tbody.innerHTML += `<tr><td>${prod.codigo}</td><td>${prod.descripcion}</td><td>${hora}</td></tr>`;
+        document.getElementById('escaner-estado').textContent = `✅ "${prod.descripcion}" entregado a ${sesionEscaneo.usuario.nombre}. Sigue escaneando...`;
+    }
+
+    async function onCodigoEscaneado(textoDecodificado) {
+        const codigo = textoDecodificado.trim();
+        const ahora = Date.now();
+        if (codigo === ultimoCodigoEscaneado && (ahora - ultimoTiempoEscaneado) < 4000) return;
+        ultimoCodigoEscaneado = codigo; ultimoTiempoEscaneado = ahora;
+
+        const estado = document.getElementById('escaner-estado');
+        let prod = data.productos.find(p => p.codigo.toLowerCase() === codigo.toLowerCase());
+        if (!prod) prod = data.productos.find(p => (p.numeroSerie || '').toLowerCase() === codigo.toLowerCase());
+
+        if (prod) {
+            if (!productoDisponible(prod.codigo)) {
+                const asigActual = data.asignaciones.find(a => a.codigoProducto === prod.codigo && a.estado === 'Activo');
+                const otroUsr = data.usuarios.find(u => u.dni === asigActual?.dniUsuario);
+                if (!confirm(`"${prod.descripcion}" (${prod.codigo}) ya está asignado a ${otroUsr ? otroUsr.nombre : 'otra persona'}. ¿Reasignarlo a ${sesionEscaneo.usuario.nombre}?`)) {
+                    estado.textContent = 'Escaneo cancelado. Sigue escaneando otro ítem.';
+                    return;
+                }
+                await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asigActual.id);
+                asigActual.estado = 'Devuelto';
+            }
+            await crearAsignacionDesdeEscaner(prod);
+        } else {
+            abrirModal('Producto no encontrado — Completar datos', `
+                <p style="color:#666; margin-bottom:0.8rem;">Código/serie escaneado: <strong>${codigo}</strong></p>
+                <div class="form-group"><label>Código de producto *</label><input type="text" id="qa-codigo" value="${codigo}"></div>
+                <div class="form-group"><label>Nº de Serie</label><input type="text" id="qa-serie" value="${codigo}"></div>
+                <div class="form-group"><label>Descripción *</label><input type="text" id="qa-descripcion"></div>
+                <div class="form-group"><label>Marca</label><input type="text" id="qa-marca"></div>
+                <div class="form-group"><label>Modelo</label><input type="text" id="qa-modelo"></div>
+            `, async () => {
+                const nuevoCodigo = obtenerValor('qa-codigo');
+                if (!nuevoCodigo) { alert('El código es obligatorio.'); return; }
+                if (data.productos.some(p => p.codigo === nuevoCodigo)) { alert('Ese código ya existe.'); return; }
+                const nuevoProd = { codigo: nuevoCodigo, categoria: '', descripcion: obtenerValor('qa-descripcion'), marca: obtenerValor('qa-marca'), modelo: obtenerValor('qa-modelo'), numeroSerie: obtenerValor('qa-serie'), imei: '', color: '', condicion: 'Usado', estadoFuncional: 'Operativo', accesorios: '', moneda: 'PEN', precioUnitario: 0 };
+                const { error } = await sb.from('productos').insert({
+                    codigo: nuevoProd.codigo, categoria: nuevoProd.categoria, descripcion: nuevoProd.descripcion, marca: nuevoProd.marca, modelo: nuevoProd.modelo,
+                    numero_serie: nuevoProd.numeroSerie, imei: nuevoProd.imei, color: nuevoProd.color, condicion: nuevoProd.condicion, estado_funcional: nuevoProd.estadoFuncional, accesorios: nuevoProd.accesorios,
+                    moneda: nuevoProd.moneda, precio_unitario: nuevoProd.precioUnitario
+                });
+                if (error) { alert('Error al guardar producto: ' + error.message); return; }
+                data.productos.push(nuevoProd);
+                await crearAsignacionDesdeEscaner(nuevoProd);
+            });
+        }
+    }
+
+    // ---- Registrar mueble sin número de serie (código automático MOB-XXXX) ----
+    document.getElementById('btn-mueble-sin-serie').addEventListener('click', () => {
+        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+        abrirModal('Registrar mueble sin número de serie', `
+            <div class="form-group"><label>Descripción *</label><input type="text" id="mob-descripcion" placeholder="Ej: Silla giratoria reposabrazos"></div>
+            <div class="form-group"><label>Marca / Color (opcional)</label><input type="text" id="mob-marca"></div>
+            <div class="form-group"><label>Condición</label><select id="mob-condicion"><option>Nuevo</option><option>Usado</option></select></div>
+        `, async () => {
+            const descripcion = obtenerValor('mob-descripcion');
+            if (!descripcion) { alert('La descripción es obligatoria.'); return; }
+            const n = await siguienteNumero('codigo_mobiliario');
+            if (n === null) { alert('No se pudo generar el código. Intenta de nuevo.'); return; }
+            const codigo = `MOB-${String(n).padStart(4, '0')}`;
+            const nuevoProd = { codigo, categoria: 'MOBILIARIO', descripcion, marca: obtenerValor('mob-marca'), modelo: '', numeroSerie: '', imei: '', color: '', condicion: obtenerValor('mob-condicion'), estadoFuncional: 'Operativo', accesorios: '', moneda: 'PEN', precioUnitario: 0 };
+            const { error } = await sb.from('productos').insert({
+                codigo: nuevoProd.codigo, categoria: nuevoProd.categoria, descripcion: nuevoProd.descripcion, marca: nuevoProd.marca, modelo: nuevoProd.modelo,
+                numero_serie: nuevoProd.numeroSerie, imei: nuevoProd.imei, color: nuevoProd.color, condicion: nuevoProd.condicion, estado_funcional: nuevoProd.estadoFuncional, accesorios: nuevoProd.accesorios,
+                moneda: nuevoProd.moneda, precio_unitario: nuevoProd.precioUnitario
+            });
+            if (error) { alert('Error al guardar: ' + error.message); return; }
+            data.productos.push(nuevoProd);
+            await crearAsignacionDesdeEscaner(nuevoProd);
+            setTimeout(() => mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo)), 300);
+        });
+    });
+
+    document.getElementById('btn-generar-cargo-escaner').addEventListener('click', () => {
+        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+        generarCargoPatrimonio(sesionEscaneo.usuario);
+    });
+
+    // ==================== DOCUMENTO FORMAL: CARGO DE BIENES ====================
+    async function generarCargoPatrimonio(usr) {
+        const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo')
+            .sort((a, b) => a.codigoProducto.localeCompare(b.codigoProducto));
+        if (equipos.length === 0) { alert('Este colaborador no tiene equipos activos asignados.'); return; }
+
+        const numero = await siguienteNumero('cargo_patrimonio');
+        const numeroTexto = numero !== null ? String(numero).padStart(4, '0') : '----';
+        const fechaTexto = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const logo = logoDataURL();
+
+        let totalSoles = 0, totalDolares = 0;
+        const filas = equipos.map(a => {
+            const prod = obtenerProducto(a.codigoProducto);
+            const costo = prod ? (Number(prod.precioUnitario) || 0) : 0;
+            const esUSD = prod && prod.moneda === 'USD';
+            if (esUSD) totalDolares += costo; else totalSoles += costo;
+            return `<tr>
+                <td style="border:1px solid #000; padding:4px;">${prod?.codigo || a.codigoProducto}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.descripcion || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.marca || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.modelo || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.numeroSerie || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.imei || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.condicion || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.estadoFuncional || ''}</td>
+                <td style="border:1px solid #000; padding:4px;">${prod?.accesorios || ''}</td>
+                <td style="border:1px solid #000; padding:4px; text-align:right;">${esUSD ? '$' : 'S/'} ${costo.toFixed(2)}</td>
+                <td style="border:1px solid #000; padding:4px;">${a.observaciones || ''}</td>
+            </tr>`;
+        }).join('');
+
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset="utf-8"><title>Cargo de Bienes</title><style>
+            @page Sec1 { size: 297mm 210mm; margin: 12mm; }
+            div.Sec1 { page: Sec1; }
+            body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; }
+            table.tabla-items { width:100%; border-collapse:collapse; font-size:9pt; }
+            table.tabla-items th { background:#FFC107; color:#1E1E1E; border:1px solid #000; padding:4px; }
+        </style></head>
+        <body><div class="Sec1">
+            <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                <tr>
+                    <td style="width:22%; text-align:center; vertical-align:middle; border:1px solid #000; padding:6px;">
+                        ${logo ? `<img src="${logo}" style="height:45px;"><br>` : ''}
+                        <strong>TAKIPUKARA</strong><br><span style="font-size:8pt;">MINERÍA &amp; CONSTRUCCIÓN</span>
+                    </td>
+                    <td style="width:53%; text-align:center; vertical-align:middle; font-size:15pt; font-weight:bold; border:1px solid #000;">
+                        CARGO - ENTREGA DE ACTIVOS EN PATRIMONIO
+                    </td>
+                    <td style="width:25%; vertical-align:top; font-size:7.5pt; padding:0;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <tr><td style="border:1px solid #000; padding:2px;">FORMATO</td><td style="border:1px solid #000; padding:2px;" colspan="2">Código: LOG-CP-0001</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;">Versión: 01</td><td style="border:1px solid #000; padding:2px;" colspan="2">Emisión: 25/09/2026</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px; background:#f2f2f2; color:#B00000; font-weight:bold;">N°</td><td style="border:1px solid #000; padding:2px; color:#B00000; font-weight:bold;" colspan="2">${numeroTexto}</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;">FECHA</td><td style="border:1px solid #000; padding:2px;" colspan="2">${fechaTexto}</td></tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:9.5pt;">
+                <tr><td style="border:1px solid #000; padding:4px; width:20%;"><strong>APELLIDOS Y NOMBRES</strong></td><td style="border:1px solid #000; padding:4px;" colspan="3">${usr.nombre.toUpperCase()}</td></tr>
+                <tr>
+                    <td style="border:1px solid #000; padding:4px;"><strong>DNI</strong></td><td style="border:1px solid #000; padding:4px;">${usr.dni}</td>
+                    <td style="border:1px solid #000; padding:4px;"><strong>CARGO</strong></td><td style="border:1px solid #000; padding:4px;">${usr.cargo}</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #000; padding:4px;"><strong>ÁREA</strong></td><td style="border:1px solid #000; padding:4px;">${usr.area}</td>
+                    <td style="border:1px solid #000; padding:4px;"><strong>CeCo</strong></td><td style="border:1px solid #000; padding:4px;">${usr.ceco || ''}</td>
+                </tr>
+            </table>
+
+            <table class="tabla-items">
+                <tr>
+                    <th>CÓDIGO SKU</th><th>DESCRIPCIÓN</th><th>MARCA</th><th>MODELO</th><th>Nro SERIE</th><th>IMEI</th>
+                    <th>CONDICIÓN</th><th>ESTADO FUNCIONAL</th><th>ACCESORIOS</th><th>COSTO DEL BIEN</th><th>OBSERVACIÓN</th>
+                </tr>
+                ${filas}
+                <tr><td colspan="9" style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">TOTAL</td><td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">S/ ${totalSoles.toFixed(2)}${totalDolares > 0 ? ` + $ ${totalDolares.toFixed(2)}` : ''}</td><td style="border:1px solid #000;"></td></tr>
+            </table>
+
+            <p style="font-size:8.5pt; text-align:justify; margin-top:14px; line-height:1.4;">
+                Los activos patrimoniales entregados por TAKIPUKARA S.A.C. al colaborador son de uso exclusivo para el desempeño de sus funciones laborales, constituyendo una herramienta de trabajo indispensable para el cumplimiento de sus obligaciones.<br>
+                El receptor se compromete a utilizar los bienes con la diligencia debida, adoptando todas las medidas necesarias para garantizar su conservación y correcto funcionamiento.<br>
+                Es responsabilidad del trabajador custodiar los activos asignados durante el periodo de vigencia de su relación laboral.<br>
+                En caso de cese o retiro de la empresa, el colaborador deberá devolver la totalidad de los bienes en las mismas condiciones físicas y operativas en que fueron recibidos, salvo el desgaste natural derivado del uso ordinario y razonable al cual no será objeto de reparación.<br>
+                Si se detectaran daños, pérdidas o deterioros atribuibles a una negligencia, mal uso o incumplimiento de las normas de seguridad, el trabajador asumirá la obligación de reponer el activo por otro de similares características o, en su defecto, abonar el monto establecido para su reparación o reposición, según el valor comercial o el costo de reposición vigente, previa conciliación con el área de Logística o Administración.<br>
+                Queda expresamente excluido de esta responsabilidad el desgaste progresivo y normal ocasionado por el tiempo de uso y la antigüedad del bien, siempre que no medie imprudencia o uso indebido.
+            </p>
+
+            <table style="width:100%; margin-top:40px;">
+                <tr>
+                    <td style="width:50%; text-align:center;">_______________________________<br>RECEPTOR: ${usr.nombre}<br>DNI: ${usr.dni}</td>
+                    <td style="width:50%; text-align:center;">_______________________________<br>LOGÍSTICA<br>${sesion ? sesion.nombre : ''}</td>
+                </tr>
+            </table>
+        </div></body></html>`;
+
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Cargo_Patrimonio_${numeroTexto}_${usr.nombre.replace(/[^a-zA-Z0-9]+/g, '_')}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 </script>
 </body>
 </html>
