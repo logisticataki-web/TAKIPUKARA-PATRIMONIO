@@ -1476,9 +1476,14 @@
         if (equipos.length === 0) { alert('Este colaborador no tiene equipos activos asignados.'); return; }
 
         const numero = await siguienteNumero('cargo_patrimonio');
-        const numeroTexto = numero !== null ? String(numero).padStart(4, '0') : '----';
+        const numeroTexto = numero !== null ? String(numero) : '----';
         const fechaTexto = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const logo = logoDataURL();
+
+        // Anchos de columna tomados directamente del Excel real "FORMATO DE ENTREGA"
+        // (proporciones de: A, B+C+D, E, F, G+H, I, J, K, L, M, N+O)
+        const anchosCol = [4.5, 22.4, 6.6, 5.6, 10.2, 3.6, 4.7, 5.9, 18.0, 5.9, 12.4];
+        const colgroup = `<colgroup>${anchosCol.map(w => `<col style="width:${w}%;">`).join('')}</colgroup>`;
 
         let totalSoles = 0, totalDolares = 0;
         const filas = equipos.map(a => {
@@ -1487,83 +1492,92 @@
             const esUSD = prod && prod.moneda === 'USD';
             if (esUSD) totalDolares += costo; else totalSoles += costo;
             return `<tr>
-                <td style="border:1px solid #000; padding:4px;">${prod?.codigo || a.codigoProducto}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.descripcion || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.marca || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.modelo || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.numeroSerie || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.imei || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.condicion || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.estadoFuncional || ''}</td>
-                <td style="border:1px solid #000; padding:4px;">${prod?.accesorios || ''}</td>
-                <td style="border:1px solid #000; padding:4px; text-align:right;">${esUSD ? '$' : 'S/'} ${costo.toFixed(2)}</td>
-                <td style="border:1px solid #000; padding:4px;">${a.observaciones || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.codigo || a.codigoProducto}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.descripcion || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.marca || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.modelo || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.numeroSerie || 'S/M'}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.imei || 'S/M'}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.condicion || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.estadoFuncional || ''}</td>
+                <td style="border:1px solid #000; padding:3px;">${prod?.accesorios || 'SIN ACCESORIOS'}</td>
+                <td style="border:1px solid #000; padding:3px; text-align:right;">${esUSD ? '$' : 'S/'} ${costo.toFixed(2)}</td>
+                <td style="border:1px solid #000; padding:3px;">${a.observaciones || ''}</td>
             </tr>`;
         }).join('');
 
         const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head><meta charset="utf-8"><title>Cargo de Bienes</title><style>
-            @page Sec1 { size: 297mm 210mm; margin: 12mm; }
+            @page Sec1 { size: 297mm 210mm; margin: 10mm; }
             div.Sec1 { page: Sec1; }
             body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; }
-            table.tabla-items { width:100%; border-collapse:collapse; font-size:9pt; }
-            table.tabla-items th { background:#FFC107; color:#1E1E1E; border:1px solid #000; padding:4px; }
+            table.tabla-items { width:100%; border-collapse:collapse; font-size:8pt; table-layout:fixed; }
+            table.tabla-items td { word-wrap:break-word; overflow-wrap:break-word; }
+            table.tabla-items th { background:#FFC107; color:#1E1E1E; border:1px solid #000; padding:3px; font-size:7.5pt; }
         </style></head>
         <body><div class="Sec1">
-            <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+            <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
                 <tr>
-                    <td style="width:22%; text-align:center; vertical-align:middle; border:1px solid #000; padding:6px;">
+                    <td style="width:16%; text-align:center; vertical-align:middle; border:1px solid #000; padding:6px;">
                         ${logo ? `<img src="${logo}" style="height:45px;"><br>` : ''}
-                        <strong>TAKIPUKARA</strong><br><span style="font-size:8pt;">MINERÍA &amp; CONSTRUCCIÓN</span>
+                        <strong>TAKIPUKARA</strong><br><span style="font-size:7pt;">MINERÍA &amp; CONSTRUCCIÓN</span>
                     </td>
-                    <td style="width:53%; text-align:center; vertical-align:middle; font-size:15pt; font-weight:bold; border:1px solid #000;">
+                    <td style="width:64%; text-align:center; vertical-align:middle; font-size:15pt; font-weight:bold; border:1px solid #000;">
                         CARGO - ENTREGA DE ACTIVOS EN PATRIMONIO
                     </td>
-                    <td style="width:25%; vertical-align:top; font-size:7.5pt; padding:0;">
-                        <table style="width:100%; border-collapse:collapse;">
-                            <tr><td style="border:1px solid #000; padding:2px;">FORMATO</td><td style="border:1px solid #000; padding:2px;" colspan="2">Código: LOG-CP-0001</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;">Versión: 01</td><td style="border:1px solid #000; padding:2px;" colspan="2">Emisión: 25/09/2026</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px; background:#f2f2f2; color:#B00000; font-weight:bold;">N°</td><td style="border:1px solid #000; padding:2px; color:#B00000; font-weight:bold;" colspan="2">${numeroTexto}</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;">FECHA</td><td style="border:1px solid #000; padding:2px;" colspan="2">${fechaTexto}</td></tr>
+                    <td style="width:20%; vertical-align:top; font-size:7.5pt; padding:0;">
+                        <table style="width:100%; border-collapse:collapse; height:100%;">
+                            <tr><td style="border:1px solid #000; padding:2px; text-align:center; font-weight:bold;" colspan="2">FORMATO</td><td style="border:1px solid #000; padding:2px; text-align:center;">${'LOG-CP-0001'}</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Versión :</td><td style="border:1px solid #000; padding:2px;">Rv. 01</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Emisión :</td><td style="border:1px solid #000; padding:2px;">25/09/2026</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Revisión :</td><td style="border:1px solid #000; padding:2px;">LOG</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Aprobado :</td><td style="border:1px solid #000; padding:2px;">GG</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px; background:#FBE4E4; color:#B00000; font-weight:bold; text-align:center;">N°</td><td style="border:1px solid #000; padding:2px; background:#FBE4E4; color:#B00000; font-weight:bold; text-align:center;" colspan="2">${numeroTexto}</td></tr>
+                            <tr><td style="border:1px solid #000; padding:2px; text-align:center; font-weight:bold;" colspan="2">FECHA</td><td style="border:1px solid #000; padding:2px; text-align:center;">${fechaTexto}</td></tr>
                         </table>
                     </td>
                 </tr>
             </table>
 
-            <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:9.5pt;">
-                <tr><td style="border:1px solid #000; padding:4px; width:20%;"><strong>APELLIDOS Y NOMBRES</strong></td><td style="border:1px solid #000; padding:4px;" colspan="3">${usr.nombre.toUpperCase()}</td></tr>
-                <tr>
-                    <td style="border:1px solid #000; padding:4px;"><strong>DNI</strong></td><td style="border:1px solid #000; padding:4px;">${usr.dni}</td>
-                    <td style="border:1px solid #000; padding:4px;"><strong>CARGO</strong></td><td style="border:1px solid #000; padding:4px;">${usr.cargo}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #000; padding:4px;"><strong>ÁREA</strong></td><td style="border:1px solid #000; padding:4px;">${usr.area}</td>
-                    <td style="border:1px solid #000; padding:4px;"><strong>CeCo</strong></td><td style="border:1px solid #000; padding:4px;">${usr.ceco || ''}</td>
-                </tr>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:9.5pt;">
+                <tr><td style="border:1px solid #000; padding:3px; width:22%;">APELLIDOS Y NOMBRES&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.nombre.toUpperCase()}</td></tr>
+                <tr><td style="border:1px solid #000; padding:3px;">DNI&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.dni}</td></tr>
+                <tr><td style="border:1px solid #000; padding:3px;">CARGO&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.cargo}</td></tr>
+                <tr><td style="border:1px solid #000; padding:3px;">ÁREA&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.area}</td></tr>
+                <tr><td style="border:1px solid #000; padding:3px;">CeCo&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.ceco || ''}</td></tr>
             </table>
 
             <table class="tabla-items">
+                ${colgroup}
                 <tr>
-                    <th>CÓDIGO SKU</th><th>DESCRIPCIÓN</th><th>MARCA</th><th>MODELO</th><th>Nro SERIE</th><th>IMEI</th>
-                    <th>CONDICIÓN</th><th>ESTADO FUNCIONAL</th><th>ACCESORIOS</th><th>COSTO DEL BIEN</th><th>OBSERVACIÓN</th>
+                    <th>CODIGO SKU</th><th>DESCRIPCION</th><th>MARCA</th><th>MODELO</th><th>Nro SERIE</th><th>IMEI</th>
+                    <th>CONDICION</th><th>ESTADO FUNCIONAL</th><th>ACCESORIOS</th><th>COSTO DEL BIEN</th><th>OBSERVACION</th>
                 </tr>
                 ${filas}
-                <tr><td colspan="9" style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">TOTAL</td><td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">S/ ${totalSoles.toFixed(2)}${totalDolares > 0 ? ` + $ ${totalDolares.toFixed(2)}` : ''}</td><td style="border:1px solid #000;"></td></tr>
+            </table>
+            <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                ${colgroup}
+                <tr>
+                    <td colspan="8" style="border:1px solid #000; padding:3px;"></td>
+                    <td style="border:1px solid #000; padding:3px; font-weight:bold;">TOTAL</td>
+                    <td style="border:1px solid #000; padding:3px; text-align:right; font-weight:bold;">S/ ${totalSoles.toFixed(2)}${totalDolares > 0 ? `<br>$ ${totalDolares.toFixed(2)}` : ''}</td>
+                    <td style="border:1px solid #000; padding:3px;"></td>
+                </tr>
             </table>
 
             <p style="font-size:8.5pt; text-align:justify; margin-top:14px; line-height:1.4;">
                 Los activos patrimoniales entregados por TAKIPUKARA S.A.C. al colaborador son de uso exclusivo para el desempeño de sus funciones laborales, constituyendo una herramienta de trabajo indispensable para el cumplimiento de sus obligaciones.<br>
                 El receptor se compromete a utilizar los bienes con la diligencia debida, adoptando todas las medidas necesarias para garantizar su conservación y correcto funcionamiento.<br>
                 Es responsabilidad del trabajador custodiar los activos asignados durante el periodo de vigencia de su relación laboral.<br>
-                En caso de cese o retiro de la empresa, el colaborador deberá devolver la totalidad de los bienes en las mismas condiciones físicas y operativas en que fueron recibidos, salvo el desgaste natural derivado del uso ordinario y razonable al cual no será objeto de reparación.<br>
+                En caso de cese o retiro de la empresa, el colaborador deberá devolver la totalidad de los bienes en las mismas condiciones físicas y operativas en que fueron recibidos, salvo el desgaste natural derivado del uso ordinario y razonable, el cual no será objeto de reparación.<br>
                 Si se detectaran daños, pérdidas o deterioros atribuibles a una negligencia, mal uso o incumplimiento de las normas de seguridad, el trabajador asumirá la obligación de reponer el activo por otro de similares características o, en su defecto, abonar el monto establecido para su reparación o reposición, según el valor comercial o el costo de reposición vigente, previa conciliación con el área de Logística o Administración.<br>
                 Queda expresamente excluido de esta responsabilidad el desgaste progresivo y normal ocasionado por el tiempo de uso y la antigüedad del bien, siempre que no medie imprudencia o uso indebido.
             </p>
 
-            <table style="width:100%; margin-top:40px;">
+            <table style="width:100%; margin-top:50px;">
                 <tr>
-                    <td style="width:50%; text-align:center;">_______________________________<br>RECEPTOR: ${usr.nombre}<br>DNI: ${usr.dni}</td>
-                    <td style="width:50%; text-align:center;">_______________________________<br>LOGÍSTICA<br>${sesion ? sesion.nombre : ''}</td>
+                    <td style="width:50%; text-align:center;">RECEPTOR:&nbsp;&nbsp;_______________________________<br>${usr.nombre}<br>DNI: ${usr.dni}</td>
+                    <td style="width:50%; text-align:center;">LOGISTICA:&nbsp;&nbsp;_______________________________<br>${sesion ? sesion.nombre : ''}</td>
                 </tr>
             </table>
         </div></body></html>`;
