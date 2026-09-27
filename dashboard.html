@@ -175,7 +175,7 @@
                         <button class="btn btn-outline" id="btn-detener-escaner" style="display:none;">⏹️ Detener cámara</button>
                         <button class="btn btn-outline" id="btn-mueble-sin-serie">➕ Registrar mueble sin número de serie</button>
                     </div>
-                    <div id="lector-qr" style="width:100%; max-width:400px; margin:1rem auto;"></div>
+                    <div id="lector-qr" style="width:100%; max-width:650px; margin:1rem auto;"></div>
                     <p id="escaner-estado" style="text-align:center; color:#666;"></p>
                     <div class="card" style="background:#FFF8E1; margin-top:1rem;">
                         <h3 style="margin-bottom:0.6rem;">Entregado en esta sesión a <span id="escaner-nombre-usuario"></span></h3>
@@ -1337,16 +1337,29 @@
             estado.textContent = '';
             return;
         }
-        html5QrCodeInstance = new Html5Qrcode('lector-qr');
         const formatos = [
             Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E
         ];
+        // formatsToSupport y useBarCodeDetectorIfSupported van en el CONSTRUCTOR, no en start()
+        html5QrCodeInstance = new Html5Qrcode('lector-qr', {
+            formatsToSupport: formatos,
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            verbose: false
+        });
         try {
             await html5QrCodeInstance.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 250, height: 150 }, formatsToSupport: formatos },
+                {
+                    fps: 15,
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const ancho = Math.floor(viewfinderWidth * 0.9);
+                        const alto = Math.floor(viewfinderHeight * 0.4);
+                        return { width: ancho, height: alto };
+                    },
+                    videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                },
                 onCodigoEscaneado,
                 () => { /* ignorar errores de lectura silenciosos */ }
             );
