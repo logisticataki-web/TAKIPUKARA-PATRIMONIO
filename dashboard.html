@@ -143,9 +143,8 @@
 </head>
 <body>
 
-<div id="config-warning">⚠️ Falta configurar SUPABASE_URL y SUPABASE_ANON_KEY al inicio del script. Revisa las instrucciones.</div>
+<div id="config-warning">⚠️ Falta configurar SUPABASE_URL y SUPABASE_ANON_KEY al inicio del script.</div>
 
-<!-- ===== PANTALLA DE LOGIN ===== -->
 <div id="login-overlay">
     <div class="login-box">
         <img src="logo.png" alt="Logo TAKIPUKARA">
@@ -188,7 +187,6 @@
         </div>
     </div>
     <div class="content">
-        <!-- Vista Asignaciones -->
         <div id="view-asignaciones" class="view">
             <div class="card">
                 <div class="toolbar">
@@ -203,7 +201,6 @@
                 </div>
             </div>
         </div>
-        <!-- Vista Escanear -->
         <div id="view-escanear" class="view hidden">
             <div class="card">
                 <div class="form-group">
@@ -218,9 +215,7 @@
                         <button class="btn btn-outline" id="btn-agregar-sin-serie">➕ Agregar item sin serie</button>
                     </div>
                     <div class="toolbar" style="margin-top:.6rem; gap:.5rem;">
-                        <input type="text" id="input-codigo-manual"
-                               placeholder="O escribe el código / N° de serie y Enter…"
-                               style="flex:1; min-width:220px; padding:.7rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+                        <input type="text" id="input-codigo-manual" placeholder="O escribe el código / N° de serie y Enter…" style="flex:1; min-width:220px; padding:.7rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
                         <button class="btn btn-amarillo" id="btn-procesar-manual">🔍 Procesar</button>
                     </div>
                     <div id="lector-qr" style="width:100%; max-width:680px; margin:1rem auto; border-radius:12px; overflow:hidden; background:#000;"></div>
@@ -242,7 +237,6 @@
                 </div>
             </div>
         </div>
-        <!-- Vista Productos -->
         <div id="view-productos" class="view hidden">
             <div class="card">
                 <div class="toolbar">
@@ -264,7 +258,6 @@
                 </div>
             </div>
         </div>
-        <!-- Vista Usuarios -->
         <div id="view-usuarios" class="view hidden">
             <div class="card">
                 <div class="toolbar">
@@ -285,7 +278,6 @@
                 </div>
             </div>
         </div>
-        <!-- Vista Cuentas -->
         <div id="view-cuentas" class="view hidden">
             <div class="card">
                 <div class="toolbar">
@@ -304,7 +296,6 @@
 </div>
 
 <div class="modal" id="modal"><div class="modal-content" id="modal-body"></div></div>
-
 <script>
     const SUPABASE_URL = 'https://nztdsgtrlzsjrzrptvnz.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56dGRzZ3RybHpzanJ6cnB0dm56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjQ1MDgsImV4cCI6MjEwMDg0MDUwOH0.b_WpYQdCWY0Uq37gu6UdUq5MMnzCgKbWPgQOkM2Jzec';
@@ -313,13 +304,7 @@
     const SESSION_KEY = 'takipukara_session';
     const SESSION_HORAS = 12;
 
-    let data = {
-        productos: [],
-        usuarios: [],
-        asignaciones: [],
-        encargados: [],
-        cuentas: []
-    };
+    let data = { productos: [], usuarios: [], asignaciones: [], encargados: [], cuentas: [] };
     let sesion = null;
 
     function productoDesdeFila(p) {
@@ -333,31 +318,44 @@
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const ruta = `${prefijo}_${Date.now()}.${ext}`;
         const { error } = await sb.storage.from('evidencias').upload(ruta, file, { upsert: true });
-        if (error) { alert('Error al subir archivo (' + prefijo + '): ' + error.message); return null; }
+        if (error) { alert('Error al subir archivo: ' + error.message); return null; }
         const { data: pub } = sb.storage.from('evidencias').getPublicUrl(ruta);
         return pub.publicUrl;
     }
 
     async function cargarDatos() {
-        const [prod, usr, asig, enc, cta] = await Promise.all([
-            sb.from('productos').select('*').order('codigo'),
-            sb.from('usuarios').select('*').order('nombre'),
-            sb.from('asignaciones').select('*').order('id'),
-            sb.from('encargados').select('*').order('nombre'),
-            sb.from('cuentas').select('*').order('usuario')
-        ]);
-        if (prod.error || usr.error || asig.error || enc.error || cta.error) {
-            console.error(prod.error || usr.error || asig.error || enc.error || cta.error);
-            document.getElementById('login-status').textContent = 'No se pudo conectar con la base de datos.';
+        try {
+            const [prod, usr, asig, enc, cta] = await Promise.all([
+                sb.from('productos').select('*').order('codigo'),
+                sb.from('usuarios').select('*').order('nombre'),
+                sb.from('asignaciones').select('*').order('id'),
+                sb.from('encargados').select('*').order('nombre'),
+                sb.from('cuentas').select('*').order('usuario')
+            ]);
+            const err = prod.error || usr.error || asig.error || enc.error || cta.error;
+            if (err) {
+                console.error('Error Supabase:', err);
+                const st = document.getElementById('login-status');
+                if (st) st.textContent = 'Error: ' + (err.message || 'No se pudo conectar.');
+                const b = document.getElementById('btn-login');
+                if (b) { b.disabled = false; b.textContent = '🔄 Reintentar'; b.onclick = () => location.reload(); }
+                return false;
+            }
+            data.productos = prod.data.map(productoDesdeFila);
+            data.usuarios = usr.data.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo, ceco: u.ceco || '' }));
+            data.asignaciones = asig.data.map(asignacionDesdeFila);
+            data.encargados = enc.data.map(e => e.nombre);
+            if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
+            data.cuentas = cta.data.map(c => ({ usuario: c.usuario, nombre: c.nombre, rol: c.rol, hash: c.hash }));
+            return true;
+        } catch (e) {
+            console.error('Excepción cargarDatos:', e);
+            const st = document.getElementById('login-status');
+            if (st) st.textContent = 'Error de conexión: ' + e.message;
+            const b = document.getElementById('btn-login');
+            if (b) { b.disabled = false; b.textContent = '🔄 Reintentar'; b.onclick = () => location.reload(); }
             return false;
         }
-        data.productos = prod.data.map(productoDesdeFila);
-        data.usuarios = usr.data.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo, ceco: u.ceco || '' }));
-        data.asignaciones = asig.data.map(asignacionDesdeFila);
-        data.encargados = enc.data.map(e => e.nombre);
-        if (data.encargados.length === 0) data.encargados = ['Logística TAKIPUKARA'];
-        data.cuentas = cta.data.map(c => ({ usuario: c.usuario, nombre: c.nombre, rol: c.rol, hash: c.hash }));
-        return true;
     }
 
     async function sha256(texto) {
@@ -397,14 +395,8 @@
     document.getElementById('btn-login').addEventListener('click', intentarLogin);
     document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') intentarLogin(); });
     document.getElementById('login-usuario').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
-    document.getElementById('btn-logout').addEventListener('click', () => {
-        localStorage.removeItem(SESSION_KEY);
-        location.reload();
-    });
-    document.getElementById('btn-refrescar').addEventListener('click', async () => {
-        await cargarDatos();
-        renderizar();
-    });
+    document.getElementById('btn-logout').addEventListener('click', () => { localStorage.removeItem(SESSION_KEY); location.reload(); });
+    document.getElementById('btn-refrescar').addEventListener('click', async () => { await cargarDatos(); renderizar(); });
 
     (async function iniciar() {
         if (SUPABASE_URL.includes('PEGA_AQUI') || SUPABASE_ANON_KEY.includes('PEGA_AQUI')) {
@@ -466,9 +458,7 @@
     });
 
     function obtenerProducto(codigo) { return data.productos.find(p => p.codigo === codigo); }
-    function productoDisponible(codigo) {
-        return !data.asignaciones.some(a => a.codigoProducto === codigo && a.estado === 'Activo');
-    }
+    function productoDisponible(codigo) { return !data.asignaciones.some(a => a.codigoProducto === codigo && a.estado === 'Activo'); }
     function urlFichaProducto(codigo) {
         return `${window.location.origin}${window.location.pathname.replace('dashboard.html', '')}ver.html?codigo=${encodeURIComponent(codigo)}`;
     }
@@ -490,22 +480,17 @@
 
     async function exportarQRWord(bloques, opciones = {}) {
         const incluirCargo = opciones.incluirCargo !== false;
-        let secciones = '';
-        let reglasPagina = '';
-        let contador = 0;
-
+        let secciones = ''; let reglasPagina = ''; let contador = 0;
         for (const bloque of bloques) {
             const items = bloque.items;
             if (incluirCargo) {
                 contador++;
                 const secCargo = `Sec${contador}`;
                 reglasPagina += `@page ${secCargo} { size: 210mm 297mm; margin: 20mm; }\n`;
-                const filasCargo = items.map((it, i) => `<tr>
-                    <td>${i + 1}</td><td>${it.codigo}</td><td>${it.descripcion || ''}</td><td>${it.fecha || ''}</td>
-                </tr>`).join('');
+                const filasCargo = items.map((it, i) => `<tr><td>${i + 1}</td><td>${it.codigo}</td><td>${it.descripcion || ''}</td><td>${it.fecha || ''}</td></tr>`).join('');
                 secciones += `<div style="page:${secCargo};">
-                    <h2 style="text-align:center; color:#1E1E1E; margin-bottom:2px;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN</h2>
-                    <h3 style="text-align:center; color:#555; margin-top:0;">CARGO DE BIENES — ${bloque.titulo}</h3>
+                    <h2 style="text-align:center;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN</h2>
+                    <h3 style="text-align:center;">CARGO DE BIENES — ${bloque.titulo}</h3>
                     <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse; font-size:11pt; margin-top:14px;">
                         <tr style="background:#1E1E1E; color:#FFC107;"><th>#</th><th>Código</th><th>Descripción</th><th>Fecha</th></tr>
                         ${filasCargo}
@@ -517,9 +502,7 @@
             contador++;
             const secQR = `Sec${contador}`;
             const esA5 = items.length <= 6;
-            reglasPagina += esA5
-                ? `@page ${secQR} { size: 148mm 210mm; margin: 10mm; }\n`
-                : `@page ${secQR} { size: 210mm 297mm; margin: 15mm; }\n`;
+            reglasPagina += esA5 ? `@page ${secQR} { size: 148mm 210mm; margin: 10mm; }\n` : `@page ${secQR} { size: 210mm 297mm; margin: 15mm; }\n`;
             let filasQR = '';
             for (const it of items) {
                 const qrSrc = await generarQRDataURL(it.url);
@@ -530,27 +513,18 @@
                 </div>`;
             }
             secciones += `<div style="page:${secQR};">
-                <h3 style="text-align:center; color:#1E1E1E; border-bottom:2px solid #FFC107; padding-bottom:6px;">TAKIPUKARA — ${bloque.titulo}</h3>
+                <h3 style="text-align:center;">TAKIPUKARA — ${bloque.titulo}</h3>
                 <div style="text-align:center;">${filasQR}</div>
             </div>`;
         }
-
         const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset="utf-8"><title>QR TAKIPUKARA</title><style>
-            ${reglasPagina}
-            body { font-family: Calibri, Arial, sans-serif; }
-        </style></head>
+        <head><meta charset="utf-8"><title>QR TAKIPUKARA</title><style>${reglasPagina} body { font-family: Calibri, Arial, sans-serif; }</style></head>
         <body>${secciones}</body></html>`;
-
         const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `QR_TAKIPUKARA_${new Date().toISOString().slice(0, 10)}.doc`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        a.href = url; a.download = `QR_TAKIPUKARA_${new Date().toISOString().slice(0, 10)}.doc`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     }
 
     function mostrarQR(titulo, url) {
@@ -565,7 +539,7 @@
         new QRCode(qrDiv, { text: url, width: 220, height: 220, colorDark: "#1E1E1E", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.H });
         document.getElementById('btn-imprimir').onclick = () => {
             const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>QR</title></head><body style="text-align:center;font-family:sans-serif"><h2>TAKIPUKARA</h2><p style="color:#666;margin-bottom:1rem;">MINERÍA &amp; CONSTRUCCIÓN</p><img src="${qrDiv.querySelector('img').src}" style="width:250px"><p>${url}</p><script>window.print();<\/script></body></html>`);
+            win.document.write(`<html><head><title>QR</title></head><body style="text-align:center;font-family:sans-serif"><h2>TAKIPUKARA</h2><img src="${qrDiv.querySelector('img').src}" style="width:250px"><p>${url}</p><script>window.print();<\/script></body></html>`);
             win.document.close();
         };
     }
@@ -668,7 +642,6 @@
         if (valorActual) select.value = valorActual;
     }
 
-    // ---- EXPORTAR A EXCEL ----
     const ESTILO_TITULO = { font: { bold: true, sz: 16, color: { rgb: "1E1E1E" } }, fill: { fgColor: { rgb: "FFC107" } }, alignment: { horizontal: "center", vertical: "center" } };
     const ESTILO_SUBTITULO = { font: { bold: true, sz: 11, color: { rgb: "1E1E1E" } }, alignment: { horizontal: "center" } };
     const ESTILO_FECHA = { font: { italic: true, sz: 9, color: { rgb: "666666" } }, alignment: { horizontal: "center" } };
@@ -695,9 +668,7 @@
         ];
         ws['!cols'] = anchoCols.map(w => ({ wch: w }));
         ws['!rows'] = [{ hpt: 22 }, { hpt: 16 }, { hpt: 14 }];
-        ws['A1'].s = ESTILO_TITULO;
-        ws['A2'].s = ESTILO_SUBTITULO;
-        ws['A3'].s = ESTILO_FECHA;
+        ws['A1'].s = ESTILO_TITULO; ws['A2'].s = ESTILO_SUBTITULO; ws['A3'].s = ESTILO_FECHA;
         for (let c = 0; c < nCols; c++) {
             const ref = XLSX.utils.encode_cell({ r: 4, c });
             if (ws[ref]) ws[ref].s = ESTILO_ENCABEZADO;
@@ -724,41 +695,31 @@
             ['Total de personal registrado', data.usuarios.length],
             ['Total de asignaciones históricas', data.asignaciones.length]
         ];
-        const wsResumen = hojaConDiseno('RESUMEN GENERAL', ['Indicador', 'Valor'], filasResumen, [35, 15]);
-        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+        XLSX.utils.book_append_sheet(wb, hojaConDiseno('RESUMEN GENERAL', ['Indicador', 'Valor'], filasResumen, [35, 15]), 'Resumen');
         const filasAsig = data.asignaciones.map(a => {
             const prod = obtenerProducto(a.codigoProducto);
             const usr = data.usuarios.find(u => u.dni === a.dniUsuario);
             return [a.id, prod?.codigo || '', prod?.descripcion || '', usr?.nombre || '', usr?.dni || '', a.fecha, a.estado, a.encargado];
         });
-        const wsAsig = hojaConDiseno('DETALLE DE ASIGNACIONES', ['ID', 'Código', 'Producto', 'Usuario', 'DNI', 'Fecha', 'Estado', 'Encargado'], filasAsig, [7, 12, 30, 25, 12, 12, 12, 20]);
-        XLSX.utils.book_append_sheet(wb, wsAsig, 'Asignaciones');
+        XLSX.utils.book_append_sheet(wb, hojaConDiseno('DETALLE DE ASIGNACIONES', ['ID', 'Código', 'Producto', 'Usuario', 'DNI', 'Fecha', 'Estado', 'Encargado'], filasAsig, [7, 12, 30, 25, 12, 12, 12, 20]), 'Asignaciones');
         const filasProd = data.productos.map(p => [p.codigo, p.categoria || '', p.descripcion, p.marca, p.modelo, p.numeroSerie, p.imei || '', p.color || '', p.condicion, p.accesorios || '']);
-        const wsProd = hojaConDiseno('INVENTARIO DE PRODUCTOS', ['Código', 'Categoría', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'IMEI', 'Color', 'Condición', 'Accesorios'], filasProd, [12, 20, 28, 14, 16, 16, 14, 12, 12, 22]);
-        XLSX.utils.book_append_sheet(wb, wsProd, 'Productos');
+        XLSX.utils.book_append_sheet(wb, hojaConDiseno('INVENTARIO DE PRODUCTOS', ['Código', 'Categoría', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'IMEI', 'Color', 'Condición', 'Accesorios'], filasProd, [12, 20, 28, 14, 16, 16, 14, 12, 12, 22]), 'Productos');
         const filasUsr = data.usuarios.map(u => {
             const cant = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo').length;
             return [u.nombre, u.dni, u.area, u.cargo, cant];
         });
-        const wsUsr = hojaConDiseno('PERSONAL Y EQUIPOS ASIGNADOS', ['Nombre', 'DNI', 'Área', 'Cargo', 'Equipos Asignados'], filasUsr, [30, 12, 18, 20, 16]);
-        XLSX.utils.book_append_sheet(wb, wsUsr, 'Usuarios');
+        XLSX.utils.book_append_sheet(wb, hojaConDiseno('PERSONAL Y EQUIPOS ASIGNADOS', ['Nombre', 'DNI', 'Área', 'Cargo', 'Equipos Asignados'], filasUsr, [30, 12, 18, 20, 16]), 'Usuarios');
         XLSX.writeFile(wb, 'takipukara_' + new Date().toISOString().slice(0, 10) + '.xlsx');
     }
     document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
 
     function exportarInformePersonal() {
-        const filas = data.usuarios
-            .map(u => {
-                const equipos = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo');
-                return { usuario: u, cantidad: equipos.length, equipos };
-            })
-            .sort((a, b) => b.cantidad - a.cantidad)
-            .map(x => [x.usuario.nombre, x.usuario.dni, x.usuario.area, x.usuario.cargo, x.cantidad, x.equipos.map(e => e.codigoProducto).join(', ')]);
-        const ws = hojaConDiseno(
-            'INFORME DE PERSONAL - CANTIDAD DE ARTÍCULOS ASIGNADOS',
-            ['Nombre', 'DNI', 'Área', 'Cargo', 'Cantidad de Artículos', 'Códigos Asignados'],
-            filas, [30, 12, 18, 20, 18, 35]
-        );
+        const filas = data.usuarios.map(u => {
+            const equipos = data.asignaciones.filter(a => a.dniUsuario === u.dni && a.estado === 'Activo');
+            return { usuario: u, cantidad: equipos.length, equipos };
+        }).sort((a, b) => b.cantidad - a.cantidad)
+          .map(x => [x.usuario.nombre, x.usuario.dni, x.usuario.area, x.usuario.cargo, x.cantidad, x.equipos.map(e => e.codigoProducto).join(', ')]);
+        const ws = hojaConDiseno('INFORME DE PERSONAL - CANTIDAD DE ARTÍCULOS ASIGNADOS', ['Nombre', 'DNI', 'Área', 'Cargo', 'Cantidad de Artículos', 'Códigos Asignados'], filas, [30, 12, 18, 20, 18, 35]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Informe de Personal');
         XLSX.writeFile(wb, 'informe_personal_takipukara_' + new Date().toISOString().slice(0, 10) + '.xlsx');
@@ -786,27 +747,12 @@
             const prod = obtenerProducto(a.codigoProducto);
             return [i + 1, prod?.codigo || '', prod?.descripcion || '', prod?.marca || '', prod?.modelo || '', prod?.numeroSerie || '', a.fecha, a.encargado];
         });
-        const ws = hojaConDiseno(
-            `CARGO DE BIENES - ${usr.nombre.toUpperCase()}`,
-            ['Ítem', 'Código', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'Fecha de Entrega', 'Encargado'],
-            filas, [7, 12, 28, 14, 16, 16, 14, 20]
-        );
+        const ws = hojaConDiseno(`CARGO DE BIENES - ${usr.nombre.toUpperCase()}`, ['Ítem', 'Código', 'Descripción', 'Marca', 'Modelo', 'Nº Serie', 'Fecha de Entrega', 'Encargado'], filas, [7, 12, 28, 14, 16, 16, 14, 20]);
         const filaDatos = 5 + filas.length + 2;
-        XLSX.utils.sheet_add_aoa(ws, [
-            ['Datos del colaborador'],
-            ['Nombre:', usr.nombre],
-            ['DNI:', usr.dni],
-            ['Área:', usr.area],
-            ['Cargo:', usr.cargo],
-            ['Total de equipos a su cargo:', equipos.length],
-            [],
-            ['_______________________________'],
-            ['Firma del colaborador']
-        ], { origin: `A${filaDatos}` });
+        XLSX.utils.sheet_add_aoa(ws, [['Datos del colaborador'], ['Nombre:', usr.nombre], ['DNI:', usr.dni], ['Área:', usr.area], ['Cargo:', usr.cargo], ['Total de equipos a su cargo:', equipos.length], [], ['_______________________________'], ['Firma del colaborador']], { origin: `A${filaDatos}` });
         if (ws[`A${filaDatos}`]) ws[`A${filaDatos}`].s = ESTILO_SUBTITULO;
         XLSX.utils.book_append_sheet(wb, ws, 'Cargo de Bienes');
-        const nombreArchivo = `cargo_bienes_${usr.nombre.replace(/[^a-zA-Z0-9]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        XLSX.writeFile(wb, nombreArchivo);
+        XLSX.writeFile(wb, `cargo_bienes_${usr.nombre.replace(/[^a-zA-Z0-9]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
     }
 
     document.getElementById('btn-plantilla').addEventListener('click', () => {
@@ -818,7 +764,6 @@
     });
 
     document.getElementById('btn-importar').addEventListener('click', () => document.getElementById('input-importar').click());
-
     document.getElementById('tabla-productos').addEventListener('change', e => {
         if (e.target.classList.contains('check-producto')) {
             const codigo = e.target.dataset.codigo;
@@ -835,24 +780,21 @@
     });
 
     function itemsDeProductos(lista) {
-        return lista.map(p => ({ codigo: p.codigo, descripcion: p.descripcion, url: urlFichaProducto(p.codigo) }))
-            .sort((x, y) => x.codigo.localeCompare(y.codigo));
+        return lista.map(p => ({ codigo: p.codigo, descripcion: p.descripcion, url: urlFichaProducto(p.codigo) })).sort((x, y) => x.codigo.localeCompare(y.codigo));
     }
 
     document.getElementById('btn-qr-disponibles').addEventListener('click', async () => {
         const disponibles = data.productos.filter(p => productoDisponible(p.codigo));
         if (disponibles.length === 0) { alert('No hay productos disponibles sin asignar.'); return; }
         if (!confirm(`Se generará un Word con los QR de ${disponibles.length} producto(s). ¿Continuar?`)) return;
-        const items = itemsDeProductos(disponibles);
-        await exportarQRWord([{ titulo: 'Productos Disponibles (Sin Asignar)', items }], { incluirCargo: false });
+        await exportarQRWord([{ titulo: 'Productos Disponibles (Sin Asignar)', items: itemsDeProductos(disponibles) }], { incluirCargo: false });
     });
 
     document.getElementById('btn-qr-seleccionados').addEventListener('click', async () => {
         if (productosSeleccionados.size === 0) { alert('Marca al menos un producto.'); return; }
         const seleccionados = data.productos.filter(p => productosSeleccionados.has(p.codigo));
         if (!confirm(`Se generará un Word con los QR de ${seleccionados.length} producto(s). ¿Continuar?`)) return;
-        const items = itemsDeProductos(seleccionados);
-        await exportarQRWord([{ titulo: 'Productos Seleccionados', items }], { incluirCargo: false });
+        await exportarQRWord([{ titulo: 'Productos Seleccionados', items: itemsDeProductos(seleccionados) }], { incluirCargo: false });
     });
 
     document.getElementById('input-importar').addEventListener('change', async e => {
@@ -864,8 +806,7 @@
             const ws = wb.Sheets[wb.SheetNames[0]];
             const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
             const val = (r, ...claves) => { for (const k of claves) { if (r[k] !== undefined && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
-            const nuevos = [];
-            let sinCodigo = 0, yaEnPlanilla = 0;
+            const nuevos = []; let sinCodigo = 0, yaEnPlanilla = 0;
             const vistos = new Set();
             filas.forEach(r => {
                 const codigo = val(r, 'Código', 'Codigo', 'código', 'codigo', 'CÓDIGO', 'CODIGO', 'CODIGO SKU', 'Código SKU', 'Codigo SKU', 'SKU');
@@ -894,18 +835,14 @@
             });
             let agregados = 0;
             if (nuevos.length > 0) {
-                const { data: insertados, error } = await sb.from('productos')
-                    .upsert(nuevos, { onConflict: 'codigo', ignoreDuplicates: true })
-                    .select();
+                const { data: insertados, error } = await sb.from('productos').upsert(nuevos, { onConflict: 'codigo', ignoreDuplicates: true }).select();
                 if (error) { alert('Error al importar: ' + error.message); return; }
                 agregados = insertados.length;
                 data.productos.push(...insertados.map(productoDesdeFila));
             }
             renderizar();
             alert(`Importación completa.\nAgregados: ${agregados}\nYa existían: ${yaEnPlanilla}\nSin código: ${sinCodigo}`);
-        } catch (err) {
-            alert('No se pudo leer el archivo. Verifica que sea Excel válido.');
-        }
+        } catch (err) { alert('No se pudo leer el archivo.'); }
         e.target.value = '';
     });
 
@@ -927,8 +864,7 @@
             const ws = wb.Sheets[wb.SheetNames[0]];
             const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
             const val = (r, ...claves) => { for (const k of claves) { if (r[k] !== undefined && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
-            const nuevos = [];
-            let sinDni = 0, yaEnPlanilla = 0;
+            const nuevos = []; let sinDni = 0, yaEnPlanilla = 0;
             const vistos = new Set();
             filas.forEach(r => {
                 let dni = val(r, 'DNI', 'Dni', 'dni');
@@ -945,18 +881,14 @@
             });
             let agregados = 0;
             if (nuevos.length > 0) {
-                const { data: insertados, error } = await sb.from('usuarios')
-                    .upsert(nuevos, { onConflict: 'dni', ignoreDuplicates: true })
-                    .select();
+                const { data: insertados, error } = await sb.from('usuarios').upsert(nuevos, { onConflict: 'dni', ignoreDuplicates: true }).select();
                 if (error) { alert('Error: ' + error.message); return; }
                 agregados = insertados.length;
                 data.usuarios.push(...insertados.map(u => ({ nombre: u.nombre, dni: u.dni, area: u.area, cargo: u.cargo })));
             }
             renderizar();
             alert(`Importación completa.\nAgregados: ${agregados}\nYa existían: ${yaEnPlanilla}\nSin DNI: ${sinDni}`);
-        } catch (err) {
-            alert('No se pudo leer el archivo.');
-        }
+        } catch (err) { alert('No se pudo leer el archivo.'); }
         e.target.value = '';
     });
 
@@ -974,12 +906,12 @@
     document.getElementById('btn-nuevo-producto').addEventListener('click', () => {
         const html = `
             <div class="form-group"><label>Código de empresa *</label><input type="text" id="prod-codigo" required></div>
-            <div class="form-group"><label>Categoría</label><input type="text" id="prod-categoria" placeholder="Ej: EQUIPOS DE COMPUTO"></div>
+            <div class="form-group"><label>Categoría</label><input type="text" id="prod-categoria"></div>
             <div class="form-group"><label>Descripción *</label><input type="text" id="prod-descripcion" required></div>
             <div class="form-group"><label>Marca *</label><input type="text" id="prod-marca" required></div>
             <div class="form-group"><label>Modelo *</label><input type="text" id="prod-modelo" required></div>
             <div class="form-group"><label>Nº de serie *</label><input type="text" id="prod-serie" required></div>
-            <div class="form-group"><label>IMEI (opcional)</label><input type="text" id="prod-imei"></div>
+            <div class="form-group"><label>IMEI</label><input type="text" id="prod-imei"></div>
             <div class="form-group"><label>Color</label><input type="text" id="prod-color"></div>
             <div class="form-group"><label>Condición</label><select id="prod-condicion"><option>Nuevo</option><option>Usado</option><option>Reparado</option><option>Reacondicionado</option></select></div>
             <div class="form-group"><label>Estado Funcional</label><select id="prod-estado-funcional"><option>Operativo</option><option>No Operativo</option><option>En Reparación</option></select></div>
@@ -990,18 +922,8 @@
         abrirModal('Nuevo Producto', html, async () => {
             const codigo = obtenerValor('prod-codigo');
             if (data.productos.some(p => p.codigo === codigo)) { alert('Código ya existe.'); return; }
-            const nuevo = {
-                codigo, categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'),
-                modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'),
-                imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'),
-                condicion: obtenerValor('prod-condicion'), estadoFuncional: obtenerValor('prod-estado-funcional'), accesorios: obtenerValor('prod-accesorios'),
-                moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0
-            };
-            const { error } = await sb.from('productos').insert({
-                codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo,
-                numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios,
-                moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario
-            });
+            const nuevo = { codigo, categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), estadoFuncional: obtenerValor('prod-estado-funcional'), accesorios: obtenerValor('prod-accesorios'), moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0 };
+            const { error } = await sb.from('productos').insert({ codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo, numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios, moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario });
             if (error) { alert('Error: ' + error.message); return; }
             data.productos.push(nuevo);
         });
@@ -1047,12 +969,7 @@
             `;
             abrirModal('Editar Producto', html, async () => {
                 const cambios = { categoria: obtenerValor('prod-categoria'), descripcion: obtenerValor('prod-descripcion'), marca: obtenerValor('prod-marca'), modelo: obtenerValor('prod-modelo'), numeroSerie: obtenerValor('prod-serie'), imei: obtenerValor('prod-imei'), color: obtenerValor('prod-color'), condicion: obtenerValor('prod-condicion'), estadoFuncional: obtenerValor('prod-estado-funcional'), accesorios: obtenerValor('prod-accesorios'), moneda: obtenerValor('prod-moneda'), precioUnitario: parseFloat(document.getElementById('prod-precio').value) || 0 };
-                const { error } = await sb.from('productos').update({
-                    categoria: cambios.categoria, descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo,
-                    numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color,
-                    condicion: cambios.condicion, estado_funcional: cambios.estadoFuncional, accesorios: cambios.accesorios,
-                    moneda: cambios.moneda, precio_unitario: cambios.precioUnitario
-                }).eq('codigo', prod.codigo);
+                const { error } = await sb.from('productos').update({ categoria: cambios.categoria, descripcion: cambios.descripcion, marca: cambios.marca, modelo: cambios.modelo, numero_serie: cambios.numeroSerie, imei: cambios.imei, color: cambios.color, condicion: cambios.condicion, estado_funcional: cambios.estadoFuncional, accesorios: cambios.accesorios, moneda: cambios.moneda, precio_unitario: cambios.precioUnitario }).eq('codigo', prod.codigo);
                 if (error) { alert('Error: ' + error.message); return; }
                 Object.assign(prod, cambios);
             });
@@ -1067,17 +984,14 @@
                 renderizar();
             }
         }
-        if (e.target.classList.contains('btn-qr-prod')) {
-            const codigo = e.target.dataset.codigo;
-            mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo));
-        }
+        if (e.target.classList.contains('btn-qr-prod')) { mostrarQR(`QR Producto ${e.target.dataset.codigo}`, urlFichaProducto(e.target.dataset.codigo)); }
         if (e.target.id === 'btn-nuevo-usuario') {
             const html = `
                 <div class="form-group"><label>Nombre completo *</label><input type="text" id="usr-nombre"></div>
                 <div class="form-group"><label>DNI *</label><input type="text" id="usr-dni"></div>
                 <div class="form-group"><label>Área *</label><input type="text" id="usr-area"></div>
                 <div class="form-group"><label>Cargo *</label><input type="text" id="usr-cargo"></div>
-                <div class="form-group"><label>CeCo (Centro de Costo)</label><input type="text" id="usr-ceco"></div>
+                <div class="form-group"><label>CeCo</label><input type="text" id="usr-ceco"></div>
             `;
             abrirModal('Nuevo Usuario', html, async () => {
                 const dni = obtenerValor('usr-dni');
@@ -1091,17 +1005,14 @@
         if (e.target.classList.contains('btn-ver-equipos')) {
             const usr = data.usuarios.find(u => u.dni === e.target.dataset.dni);
             if (!usr) return;
-            const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo')
-                .sort((a, b) => a.codigoProducto.localeCompare(b.codigoProducto));
+            const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo').sort((a, b) => a.codigoProducto.localeCompare(b.codigoProducto));
             const filas = equipos.map(a => {
                 const prod = obtenerProducto(a.codigoProducto);
                 return `<tr><td>${prod?.codigo || '???'}</td><td>${prod?.descripcion || ''}</td><td>${a.fecha}</td></tr>`;
             }).join('');
-            const html = `<p style="margin-bottom:0.8rem; color:#555;">${usr.nombre} — ${usr.area} / ${usr.cargo}</p>
-                <table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table>`;
             const modal = document.getElementById('modal');
             const body = document.getElementById('modal-body');
-            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3>${html}<div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">📄 Exportar QR (Word)</button><button class="btn btn-outline" id="btn-exportar-usr-individual">📥 Exportar Excel</button><button class="btn btn-amarillo" id="btn-cargo-patrimonio">📋 Generar Cargo de Bienes</button></div>`;
+            body.innerHTML = `<h3>Equipos de ${usr.nombre}</h3><p style="margin-bottom:0.8rem; color:#555;">${usr.nombre} — ${usr.area} / ${usr.cargo}</p><table style="width:100%;"><thead><tr><th>Código</th><th>Producto</th><th>Fecha</th></tr></thead><tbody>${filas}</tbody></table><div class="flex-end"><button class="btn btn-outline" onclick="document.getElementById('modal').style.display='none'">Cerrar</button><button class="btn btn-outline" id="btn-imprimir-qr-persona">📄 Exportar QR (Word)</button><button class="btn btn-outline" id="btn-exportar-usr-individual">📥 Exportar Excel</button><button class="btn btn-amarillo" id="btn-cargo-patrimonio">📋 Generar Cargo de Bienes</button></div>`;
             modal.style.display = 'flex';
             document.getElementById('btn-exportar-usr-individual').onclick = () => exportarReporteUsuario(usr, equipos);
             document.getElementById('btn-cargo-patrimonio').onclick = () => generarCargoPatrimonio(usr);
@@ -1121,7 +1032,7 @@
                 <div class="form-group"><label>Nombre</label><input type="text" id="usr-nombre" value="${usr.nombre}"></div>
                 <div class="form-group"><label>Área</label><input type="text" id="usr-area" value="${usr.area}"></div>
                 <div class="form-group"><label>Cargo</label><input type="text" id="usr-cargo" value="${usr.cargo}"></div>
-                <div class="form-group"><label>CeCo (Centro de Costo)</label><input type="text" id="usr-ceco" value="${usr.ceco || ''}"></div>
+                <div class="form-group"><label>CeCo</label><input type="text" id="usr-ceco" value="${usr.ceco || ''}"></div>
             `;
             abrirModal('Editar Usuario', html, async () => {
                 const cambios = { nombre: obtenerValor('usr-nombre'), area: obtenerValor('usr-area'), cargo: obtenerValor('usr-cargo'), ceco: obtenerValor('usr-ceco') };
@@ -1182,32 +1093,26 @@
                 <div class="form-group"><label>Fecha</label><input type="date" id="asig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="asig-encargado">${opcionesEnc}</select></div>
                 <div class="form-group"><label>Observaciones</label><textarea id="asig-observaciones" rows="2"></textarea></div>
-                <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="asig-vale" accept="image/*,.pdf"></div>
+                <div class="form-group"><label>📄 Vale de salida (PDF)</label><input type="file" id="asig-vale" accept="application/pdf,.pdf"></div>
                 <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="asig-foto" accept="image/*" capture="environment"></div>
             `;
             abrirModal('Nueva Asignación', html, async () => {
                 const codigoProd = obtenerValor('asig-producto');
-                const archivoVale = document.getElementById('asig-vale').files[0];
-                const archivoFoto = document.getElementById('asig-foto').files[0];
-                const urlVale = await subirEvidencia(archivoVale, `vale_${codigoProd}`);
-                const urlFoto = await subirEvidencia(archivoFoto, `foto_${codigoProd}`);
+                const urlVale = await subirEvidencia(document.getElementById('asig-vale').files[0], `vale_${codigoProd}`);
+                const urlFoto = await subirEvidencia(document.getElementById('asig-foto').files[0], `foto_${codigoProd}`);
                 const nueva = { codigo_producto: codigoProd, dni_usuario: obtenerValor('asig-usuario'), fecha: obtenerValor('asig-fecha'), encargado: obtenerValor('asig-encargado'), estado: 'Activo', observaciones: obtenerValor('asig-observaciones'), url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error: ' + error.message); return; }
                 data.asignaciones.push(asignacionDesdeFila(fila));
             });
         }
-        if (e.target.classList.contains('btn-qr')) {
-            const codigo = e.target.dataset.codigo;
-            mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo));
-        }
+        if (e.target.classList.contains('btn-qr')) { mostrarQR(`QR Producto ${e.target.dataset.codigo}`, urlFichaProducto(e.target.dataset.codigo)); }
         if (e.target.classList.contains('btn-devolver')) {
             const asig = data.asignaciones.find(a => a.id == e.target.dataset.id);
             if (asig && confirm('¿Marcar como devuelto?')) {
                 const { error } = await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asig.id);
                 if (error) { alert('Error: ' + error.message); return; }
-                asig.estado = 'Devuelto';
-                renderizar();
+                asig.estado = 'Devuelto'; renderizar();
             }
         }
         if (e.target.classList.contains('btn-reasignar')) {
@@ -1221,13 +1126,11 @@
                 <div class="form-group"><label>Fecha</label><input type="date" id="reasig-fecha" value="${new Date().toISOString().slice(0, 10)}"></div>
                 <div class="form-group"><label>Encargado</label><select id="reasig-encargado">${opcionesEnc}</select></div>
                 <div class="form-group"><label>Observaciones</label><textarea id="reasig-observaciones" rows="2"></textarea></div>
-                <div class="form-group"><label>📄 Vale de salida (foto o PDF)</label><input type="file" id="reasig-vale" accept="image/*,.pdf"></div>
+                <div class="form-group"><label>📄 Vale de salida (PDF)</label><input type="file" id="reasig-vale" accept="application/pdf,.pdf"></div>
                 <div class="form-group"><label>📷 Foto de entrega</label><input type="file" id="reasig-foto" accept="image/*" capture="environment"></div>`;
             abrirModal('Reasignar Producto', html, async () => {
-                const archivoVale = document.getElementById('reasig-vale').files[0];
-                const archivoFoto = document.getElementById('reasig-foto').files[0];
-                const urlVale = await subirEvidencia(archivoVale, `vale_${original.codigoProducto}`);
-                const urlFoto = await subirEvidencia(archivoFoto, `foto_${original.codigoProducto}`);
+                const urlVale = await subirEvidencia(document.getElementById('reasig-vale').files[0], `vale_${original.codigoProducto}`);
+                const urlFoto = await subirEvidencia(document.getElementById('reasig-foto').files[0], `foto_${original.codigoProducto}`);
                 const nueva = { codigo_producto: original.codigoProducto, dni_usuario: obtenerValor('reasig-usuario'), fecha: obtenerValor('reasig-fecha'), encargado: obtenerValor('reasig-encargado'), estado: 'Activo', observaciones: obtenerValor('reasig-observaciones'), url_vale: urlVale, url_foto: urlFoto };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (error) { alert('Error: ' + error.message); return; }
@@ -1244,11 +1147,9 @@
                 <div class="form-group"><label>Subir / reemplazar foto de entrega</label><input type="file" id="ev-foto" accept="image/*" capture="environment"></div>
             `;
             abrirModal(`Evidencia - Asignación #${asig.id}`, html, async () => {
-                const archivoVale = document.getElementById('ev-vale').files[0];
-                const archivoFoto = document.getElementById('ev-foto').files[0];
                 const cambios = {};
-                if (archivoVale) cambios.url_vale = await subirEvidencia(archivoVale, `vale_${asig.codigoProducto}`);
-                if (archivoFoto) cambios.url_foto = await subirEvidencia(archivoFoto, `foto_${asig.codigoProducto}`);
+                if (document.getElementById('ev-vale').files[0]) cambios.url_vale = await subirEvidencia(document.getElementById('ev-vale').files[0], `vale_${asig.codigoProducto}`);
+                if (document.getElementById('ev-foto').files[0]) cambios.url_foto = await subirEvidencia(document.getElementById('ev-foto').files[0], `foto_${asig.codigoProducto}`);
                 if (Object.keys(cambios).length === 0) return;
                 const { error } = await sb.from('asignaciones').update(cambios).eq('id', asig.id);
                 if (error) { alert('Error: ' + error.message); return; }
@@ -1288,7 +1189,7 @@
         } catch (e) { return ''; }
     }
 
-    // ==================== ESCANEAR v4 (BarcodeDetector + variantes) ====================
+    // ==================== ESCANEAR v4 ====================
     let sesionEscaneo = { usuario: null, items: [] };
     let html5QrCodeInstance = null;
     let ultimoCodigoEscaneado = null;
@@ -1303,12 +1204,10 @@
         const el = document.getElementById('escaner-feedback'); if (!el) return;
         el.style.display = 'block'; el.textContent = msg;
         el.style.background = tipo==='ok'?'#DCFCE7':tipo==='warn'?'#FEF3C7':'#FEE2E2';
-        el.style.color      = tipo==='ok'?'#166534':tipo==='warn'?'#92400E':'#991B1B';
+        el.style.color = tipo==='ok'?'#166534':tipo==='warn'?'#92400E':'#991B1B';
         setTimeout(()=>{ el.style.display='none'; }, 6000);
     }
-
     function normalizarCodigo(c) { return String(c||'').trim().toUpperCase().replace(/[\s\-_]/g,''); }
-
     function buscarProductoPorCodigo(codigo) {
         const obj = normalizarCodigo(codigo);
         if (!obj) return null;
@@ -1357,7 +1256,6 @@
         const estado = document.getElementById('escaner-estado');
         estado.textContent = 'Cargando el lector…';
         try { await cargarLibreriaEscaneo(); } catch(e) { alert(e.message); return; }
-
         const formatos = [
             Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.CODE_93,
@@ -1376,25 +1274,12 @@
         try {
             await html5QrCodeInstance.start(
                 { facingMode: 'environment' },
-                {
-                    fps: 20,
-                    qrbox: (w,h) => ({ width: Math.floor(w*0.96), height: Math.floor(h*0.35) }),
-                    aspectRatio: 1.777,
-                    disableFlip: false,
-                    videoConstraints: {
-                        facingMode: 'environment',
-                        width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 },
-                        focusMode: 'continuous', advanced: [{ focusMode: 'continuous' }]
-                    }
-                },
+                { fps: 20, qrbox: (w,h) => ({ width: Math.floor(w*0.96), height: Math.floor(h*0.35) }), aspectRatio: 1.777, disableFlip: false, videoConstraints: { facingMode: 'environment', width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, focusMode: 'continuous', advanced: [{ focusMode: 'continuous' }] } },
                 onCodigoEscaneado, () => {}
             );
             escaneoActivo = true;
             const video = document.querySelector('#lector-qr video');
-            if (video && video.srcObject) {
-                camaraTrack = video.srcObject.getVideoTracks()[0];
-                configurarZoomLinterna();
-            }
+            if (video && video.srcObject) { camaraTrack = video.srcObject.getVideoTracks()[0]; configurarZoomLinterna(); }
             document.getElementById('btn-iniciar-escaner').style.display = 'none';
             document.getElementById('btn-detener-escaner').style.display = 'inline-block';
             document.getElementById('btn-capturar-frame').style.display = 'inline-block';
@@ -1432,38 +1317,29 @@
 
         let resultado = null;
 
-        // MOTOR 1: BarcodeDetector nativo
+        // Motor 1: BarcodeDetector nativo
         if ('BarcodeDetector' in window) {
             try {
                 const formatos = await BarcodeDetector.getSupportedFormats();
                 const detector = new BarcodeDetector({ formats: formatos });
                 const codigos = await detector.detect(canvas);
-                if (codigos && codigos.length > 0) {
-                    resultado = codigos[0].rawValue;
-                    console.log('✅ BarcodeDetector nativo:', resultado);
-                }
+                if (codigos && codigos.length > 0) { resultado = codigos[0].rawValue; console.log('✅ Nativo:', resultado); }
             } catch (e) { console.warn('BarcodeDetector falló:', e); }
         }
 
-        // MOTOR 2: html5-qrcode con variantes
+        // Motor 2: variantes
         if (!resultado) {
             const variantes = await generarVariantesImagen(canvas);
             for (let i = 0; i < variantes.length; i++) {
                 try {
                     const r = await html5QrCodeInstance.scanFile(variantes[i], false);
-                    if (r) { resultado = r; console.log('✅ variante #' + i + ':', r); break; }
+                    if (r) { resultado = r; console.log('✅ Variante #' + i + ':', r); break; }
                 } catch (e) {}
             }
         }
 
-        if (resultado) {
-            estado.textContent = '✅ Leído';
-            onCodigoEscaneado(resultado);
-        } else {
-            sonidoError(); vibrar([100, 40, 100]);
-            feedback('error', '❌ No se pudo leer. Acércate, usa linterna o escribe el código abajo.');
-            estado.textContent = 'Reintenta o escribe manualmente.';
-        }
+        if (resultado) { estado.textContent = '✅ Leído'; onCodigoEscaneado(resultado); }
+        else { sonidoError(); vibrar([100,40,100]); feedback('error','❌ No se pudo leer. Acércate, usa linterna o escribe el código abajo.'); estado.textContent='Reintenta o escribe manualmente.'; }
     });
 
     async function generarVariantesImagen(canvasOriginal) {
@@ -1478,8 +1354,7 @@
         const filtros = ['orig', 'bn', 'inv'];
         for (const c of crops) {
             const c2 = document.createElement('canvas');
-            c2.width = Math.floor(W * c.w);
-            c2.height = Math.floor(H * c.h);
+            c2.width = Math.floor(W * c.w); c2.height = Math.floor(H * c.h);
             const ctx = c2.getContext('2d');
             ctx.drawImage(canvasOriginal, W*c.x, H*c.y, W*c.w, H*c.h, 0, 0, c2.width, c2.height);
             let baseCanvas = c2;
@@ -1497,8 +1372,7 @@
                 let finalCanvas = baseCanvas;
                 if (f !== 'orig') {
                     finalCanvas = document.createElement('canvas');
-                    finalCanvas.width = baseCanvas.width;
-                    finalCanvas.height = baseCanvas.height;
+                    finalCanvas.width = baseCanvas.width; finalCanvas.height = baseCanvas.height;
                     const fctx = finalCanvas.getContext('2d');
                     fctx.drawImage(baseCanvas, 0, 0);
                     const img = fctx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
@@ -1550,19 +1424,12 @@
     });
 
     function agregarItemALista(item) {
-        if (sesionEscaneo.items.some(i => i.codigo === item.codigo)) {
-            feedback('warn', `⚠️ "${item.descripcion}" ya está en la lista.`);
-            return false;
-        }
+        if (sesionEscaneo.items.some(i => i.codigo === item.codigo)) { feedback('warn', `⚠️ "${item.descripcion}" ya está en la lista.`); return false; }
         sesionEscaneo.items.push(item);
         const tbody = document.getElementById('escaner-tabla-sesion');
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.numeroSerie||'S/M'}</td>
-            <td><button class="btn btn-danger btn-sm">✕</button></td>`;
-        tr.querySelector('button').onclick = () => {
-            sesionEscaneo.items = sesionEscaneo.items.filter(i => i.codigo !== item.codigo);
-            tr.remove();
-        };
+        tr.innerHTML = `<td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.numeroSerie||'S/M'}</td><td><button class="btn btn-danger btn-sm">✕</button></td>`;
+        tr.querySelector('button').onclick = () => { sesionEscaneo.items = sesionEscaneo.items.filter(i => i.codigo !== item.codigo); tr.remove(); };
         tbody.appendChild(tr);
         return true;
     }
@@ -1573,36 +1440,18 @@
         const ahora = Date.now();
         if (codigo === ultimoCodigoEscaneado && (ahora - ultimoTiempoEscaneado) < 3000) return;
         ultimoCodigoEscaneado = codigo; ultimoTiempoEscaneado = ahora;
-
         const prod = buscarProductoPorCodigo(codigo);
         if (prod) {
-            const ok = agregarItemALista({
-                codigo: prod.codigo,
-                descripcion: prod.descripcion,
-                numeroSerie: prod.numeroSerie || '',
-                observacion: ''
-            });
-            if (ok) {
-                sonidoOK(); vibrar(80);
-                feedback('ok', `✅ "${prod.descripcion}" agregado.`);
-            }
+            const ok = agregarItemALista({ codigo: prod.codigo, descripcion: prod.descripcion, numeroSerie: prod.numeroSerie || '', observacion: '' });
+            if (ok) { sonidoOK(); vibrar(80); feedback('ok', `✅ "${prod.descripcion}" agregado.`); }
         } else {
             sonidoError(); vibrar([100,50,100]);
             feedback('error', `❌ No está registrado: ${codigo}`);
-            if (confirm(`El código "${codigo}" NO está en la BD.\n\n¿Deseas registrarlo como equipo NUEVO?`)) {
-                abrirModalRegistrarItem(codigo);
-            }
+            if (confirm(`El código "${codigo}" NO está en la BD.\n\n¿Deseas registrarlo como equipo NUEVO?`)) abrirModalRegistrarItem(codigo);
         }
     }
 
-    const FAMILIAS = {
-        'LAP': 'Laptop', 'MON': 'Monitor', 'TAB': 'Tablet', 'CEL': 'Celular',
-        'CPU': 'CPU', 'IMP': 'Impresora', 'PRO': 'Proyector', 'ACC': 'Accesorio',
-        'MEM': 'Memoria', 'ESC': 'Escritorio', 'SIL': 'Silla', 'EST': 'Estantería',
-        'RAC': 'Rack', 'ALM': 'Anaquel/Andamio', 'AUX': 'Equipo auxiliar',
-        'PAR': 'Parlante', 'ALC': 'Alcoholímetro', 'TOR': 'Detector de tormenta',
-        'TOP': 'Estación topográfica', 'MOB': 'Mobiliario'
-    };
+    const FAMILIAS = { 'LAP': 'Laptop', 'MON': 'Monitor', 'TAB': 'Tablet', 'CEL': 'Celular', 'CPU': 'CPU', 'IMP': 'Impresora', 'PRO': 'Proyector', 'ACC': 'Accesorio', 'MEM': 'Memoria', 'ESC': 'Escritorio', 'SIL': 'Silla', 'EST': 'Estantería', 'RAC': 'Rack', 'ALM': 'Anaquel/Andamio', 'AUX': 'Equipo auxiliar', 'PAR': 'Parlante', 'ALC': 'Alcoholímetro', 'TOR': 'Detector de tormenta', 'TOP': 'Estación topográfica', 'MOB': 'Mobiliario' };
 
     document.getElementById('btn-agregar-sin-serie').addEventListener('click', () => {
         if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
@@ -1610,12 +1459,11 @@
     });
 
     function abrirModalRegistrarItem(codigoInicial) {
-        const opcionesFamilia = Object.entries(FAMILIAS)
-            .map(([k,v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
+        const opcionesFamilia = Object.entries(FAMILIAS).map(([k,v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
         abrirModal('Registrar nuevo item', `
             ${codigoInicial ? `<p style="color:#92400E; background:#FEF3C7; padding:.5rem; border-radius:6px; margin-bottom:.8rem;">Código escaneado: <b>${codigoInicial}</b></p>` : ''}
             <div class="form-group"><label>Familia / Tipo *</label><select id="new-familia">${opcionesFamilia}</select></div>
-            <div class="form-group"><label>Descripción *</label><input type="text" id="new-descripcion" placeholder="Ej: Monitor LED 24 pulgadas"></div>
+            <div class="form-group"><label>Descripción *</label><input type="text" id="new-descripcion"></div>
             <div class="form-group"><label>Marca</label><input type="text" id="new-marca"></div>
             <div class="form-group"><label>Modelo</label><input type="text" id="new-modelo"></div>
             <div class="form-group"><label>N° de Serie</label><input type="text" id="new-serie" value="${codigoInicial && !codigoInicial.match(/^[A-Z]{3}\d{4,}$/i) ? codigoInicial : ''}"></div>
@@ -1625,28 +1473,11 @@
             const descripcion = obtenerValor('new-descripcion');
             if (!descripcion) { alert('La descripción es obligatoria.'); return; }
             const prefijo = familia;
-            const existentes = data.productos
-                .filter(p => p.codigo.toUpperCase().startsWith(prefijo))
-                .map(p => parseInt(p.codigo.substring(prefijo.length)) || 0);
+            const existentes = data.productos.filter(p => p.codigo.toUpperCase().startsWith(prefijo)).map(p => parseInt(p.codigo.substring(prefijo.length)) || 0);
             const siguiente = (existentes.length ? Math.max(...existentes) : 0) + 1;
             const codigo = `${prefijo}${String(siguiente).padStart(4, '0')}`;
-            const nuevo = {
-                codigo, categoria: '', descripcion,
-                marca: obtenerValor('new-marca'),
-                modelo: obtenerValor('new-modelo'),
-                numeroSerie: obtenerValor('new-serie'),
-                imei: '', color: '',
-                condicion: obtenerValor('new-condicion'),
-                estadoFuncional: 'Operativo', accesorios: '',
-                moneda: 'PEN', precioUnitario: 0
-            };
-            const { error } = await sb.from('productos').insert({
-                codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion,
-                marca: nuevo.marca, modelo: nuevo.modelo, numero_serie: nuevo.numeroSerie,
-                imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion,
-                estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios,
-                moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario
-            });
+            const nuevo = { codigo, categoria: '', descripcion, marca: obtenerValor('new-marca'), modelo: obtenerValor('new-modelo'), numeroSerie: obtenerValor('new-serie'), imei: '', color: '', condicion: obtenerValor('new-condicion'), estadoFuncional: 'Operativo', accesorios: '', moneda: 'PEN', precioUnitario: 0 };
+            const { error } = await sb.from('productos').insert({ codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion, marca: nuevo.marca, modelo: nuevo.modelo, numero_serie: nuevo.numeroSerie, imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion, estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios, moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario });
             if (error) { alert('Error: ' + error.message); return; }
             data.productos.push(nuevo);
             agregarItemALista({ codigo: nuevo.codigo, descripcion: nuevo.descripcion, numeroSerie: nuevo.numeroSerie, observacion: '' });
@@ -1661,7 +1492,7 @@
         abrirRevisionCargo();
     });
 
-    // ==================== REVISIÓN + FORMATO ====================
+    // ==================== REVISIÓN + FORMATO (incluye items ya asignados en BD) ====================
     async function abrirRevisionCargo() {
         const usr = sesionEscaneo.usuario;
         const numSugerido = await siguienteNumero('cargo_patrimonio');
@@ -1673,27 +1504,14 @@
             .filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo' && !codigosEscaneados.has(a.codigoProducto))
             .map(a => {
                 const p = obtenerProducto(a.codigoProducto);
-                return {
-                    codigo: a.codigoProducto,
-                    descripcion: p?.descripcion || '',
-                    numeroSerie: p?.numeroSerie || '',
-                    observacion: a.observaciones || '',
-                    origen: 'BD',
-                    idAsignacion: a.id
-                };
+                return { codigo: a.codigoProducto, descripcion: p?.descripcion || '', numeroSerie: p?.numeroSerie || '', observacion: a.observaciones || '', origen: 'BD', idAsignacion: a.id };
             });
         const itemsCombinados = [...itemsEscaneados, ...asignadosBD];
-
-        if (itemsCombinados.length === 0) {
-            alert('No hay items. Escanea al menos uno o verifica asignaciones.');
-            return;
-        }
+        if (itemsCombinados.length === 0) { alert('No hay items. Escanea al menos uno o verifica asignaciones.'); return; }
 
         const filas = itemsCombinados.map((it, i) => {
             const p = obtenerProducto(it.codigo);
-            const badge = it.origen === 'NUEVO'
-                ? '<span style="background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-size:.7rem; font-weight:700;">🆕 ESCANEADO</span>'
-                : '<span style="background:#DBEAFE; color:#1E40AF; padding:2px 8px; border-radius:10px; font-size:.7rem; font-weight:700;">📁 YA ASIGNADO</span>';
+            const badge = it.origen === 'NUEVO' ? '<span style="background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-size:.7rem; font-weight:700;">🆕 ESCANEADO</span>' : '<span style="background:#DBEAFE; color:#1E40AF; padding:2px 8px; border-radius:10px; font-size:.7rem; font-weight:700;">📁 YA ASIGNADO</span>';
             return `<tr data-codigo="${it.codigo}" data-origen="${it.origen}">
                 <td style="text-align:center;"><input type="checkbox" class="chk-incluir" checked></td>
                 <td>${i+1}</td>
@@ -1710,23 +1528,17 @@
         body.style.maxWidth = '1000px';
         body.innerHTML = `
             <h3>📋 Revisar Formato de Entrega</h3>
-            <p style="color:#6B7280; font-size:.9rem; margin-bottom:.5rem;">
-                Colaborador: <b>${usr.nombre}</b> — DNI ${usr.dni}
-            </p>
-            <p style="color:#6B7280; font-size:.82rem; margin-bottom:1rem;">
-                🆕 ${itemsEscaneados.length} escaneado(s) ahora · 📁 ${asignadosBD.length} ya asignado(s) en BD · <b>Total: ${itemsCombinados.length}</b>
-            </p>
+            <p style="color:#6B7280; font-size:.9rem; margin-bottom:.5rem;">Colaborador: <b>${usr.nombre}</b> — DNI ${usr.dni}</p>
+            <p style="color:#6B7280; font-size:.82rem; margin-bottom:1rem;">🆕 ${itemsEscaneados.length} escaneado(s) ahora · 📁 ${asignadosBD.length} ya asignado(s) en BD · <b>Total: ${itemsCombinados.length}</b></p>
             <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
                 <div class="form-group" style="flex:1; min-width:140px;">
                     <label>N° de Cargo</label>
-                    <input type="text" id="cargo-numero" value="${numeroDefault}"
-                           style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+                    <input type="text" id="cargo-numero" value="${numeroDefault}" style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
                     <small style="color:#6B7280; font-size:.75rem;">Sugerido: ${numeroDefault || 'sin dato'}. Editable.</small>
                 </div>
                 <div class="form-group" style="flex:1; min-width:140px;">
                     <label>Fecha</label>
-                    <input type="date" id="cargo-fecha" value="${new Date().toISOString().slice(0,10)}"
-                           style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+                    <input type="date" id="cargo-fecha" value="${new Date().toISOString().slice(0,10)}" style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
                 </div>
             </div>
             <div class="toolbar" style="margin-bottom:.5rem;">
@@ -1759,28 +1571,14 @@
         modal.style.display = 'flex';
 
         body.querySelectorAll('.obs-item').forEach(inp => {
-            inp.oninput = () => {
-                const it = itemsCombinados.find(i => i.codigo === inp.dataset.codigo);
-                if (it) it.observacion = inp.value;
-            };
+            inp.oninput = () => { const it = itemsCombinados.find(i => i.codigo === inp.dataset.codigo); if (it) it.observacion = inp.value; };
         });
-
         document.getElementById('btn-chk-todos').onclick = () => body.querySelectorAll('.chk-incluir').forEach(c => c.checked = true);
         document.getElementById('btn-chk-ninguno').onclick = () => body.querySelectorAll('.chk-incluir').forEach(c => c.checked = false);
-        document.getElementById('btn-chk-solo-nuevos').onclick = () => {
-            body.querySelectorAll('#cargo-items-body tr').forEach(tr => {
-                tr.querySelector('.chk-incluir').checked = (tr.dataset.origen === 'NUEVO');
-            });
-        };
-
+        document.getElementById('btn-chk-solo-nuevos').onclick = () => { body.querySelectorAll('#cargo-items-body tr').forEach(tr => { tr.querySelector('.chk-incluir').checked = (tr.dataset.origen === 'NUEVO'); }); };
         window.__itemsRevision = itemsCombinados;
-
         document.getElementById('btn-cancelar-rev').onclick = () => { modal.style.display = 'none'; body.style.maxWidth = ''; };
-        document.getElementById('btn-agregar-durante-rev').onclick = () => {
-            modal.style.display = 'none';
-            abrirModalRegistrarItem('');
-            setTimeout(() => abrirRevisionCargo(), 50);
-        };
+        document.getElementById('btn-agregar-durante-rev').onclick = () => { modal.style.display = 'none'; abrirModalRegistrarItem(''); setTimeout(() => abrirRevisionCargo(), 50); };
         document.getElementById('btn-confirmar-generar').onclick = async () => {
             const numero = document.getElementById('cargo-numero').value.trim() || 'SIN-N°';
             const fecha = document.getElementById('cargo-fecha').value;
@@ -1806,25 +1604,43 @@
             for (const it of itemsSeleccionados) {
                 if (it.origen === 'BD') continue;
                 const prev = data.asignaciones.find(a => a.codigoProducto === it.codigo && a.estado === 'Activo');
-                if (prev) {
-                    await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', prev.id);
-                    prev.estado = 'Devuelto';
-                }
-                const nueva = {
-                    codigo_producto: it.codigo,
-                    dni_usuario: usr.dni,
-                    fecha: fecha || new Date().toISOString().slice(0,10),
-                    encargado: sesion.nombre,
-                    estado: 'Activo',
-                    observaciones: it.observacion || ''
-                };
+                if (prev) { await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', prev.id); prev.estado = 'Devuelto'; }
+                const nueva = { codigo_producto: it.codigo, dni_usuario: usr.dni, fecha: fecha || new Date().toISOString().slice(0,10), encargado: sesion.nombre, estado: 'Activo', observaciones: it.observacion || '' };
                 const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
                 if (!error) { data.asignaciones.push(asignacionDesdeFila(fila)); creadas++; }
             }
-
             await generarCargoDeEntregaV3(usr, numero, fecha, itemsSeleccionados);
-
             modal.style.display = 'none';
             document.getElementById('modal-body').style.maxWidth = '';
+            if (confirm(`✅ Formato generado (${itemsSeleccionados.length} items). Nuevas asignaciones: ${creadas}.\n\n¿Deseas subir ahora el PDF escaneado y firmado?`)) abrirModalSubirPDFCargo(usr);
+            sesionEscaneo.items = [];
+            document.getElementById('escaner-tabla-sesion').innerHTML = '';
+            window.__itemsRevision = null;
+        } catch (e) { alert('Error: ' + e.message); }
+        finally { btn.disabled = false; btn.textContent = '✅ Generar Formato y Actualizar'; }
+    }
 
-            if (confirm(`✅ Formato generado
+    function abrirModalSubirPDFCargo(usr) {
+        abrirModal('Subir PDF escaneado del formato firmado', `
+            <p style="color:#6B7280; margin-bottom:.8rem;">Sube el <b>PDF escaneado</b> del Formato de Entrega ya firmado por <b>${usr.nombre}</b>.<br><small>⚠️ Solo archivos PDF (no fotos).</small></p>
+            <div class="form-group"><label>Archivo PDF *</label><input type="file" id="pdf-firmado" accept="application/pdf,.pdf"></div>
+        `, async () => {
+            const file = document.getElementById('pdf-firmado').files[0];
+            if (!file) { alert('Selecciona un PDF.'); return; }
+            if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') { alert('❌ Solo se aceptan archivos PDF escaneados.'); return; }
+            const url = await subirEvidencia(file, `cargo_firmado_${usr.dni}`);
+            if (!url) return;
+            const activas = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo');
+            for (const a of activas) { await sb.from('asignaciones').update({ url_vale: url }).eq('id', a.id); a.urlVale = url; }
+            alert('✅ PDF escaneado guardado.');
+        });
+    }
+
+    async function generarCargoDeEntregaV3(usr, numeroTexto, fechaISO, items) {
+        if (!items || !items.length) { alert('No hay items.'); return; }
+        const fechaTexto = fechaISO ? new Date(fechaISO + 'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) : new Date().toLocaleDateString('es-PE');
+        const logo = logoDataURL();
+        let totalSoles = 0, totalDolares = 0;
+        const filas = items.map((it, i) => {
+            const p = obtenerProducto(it.codigo) || {};
+            const costo = Number(p.precioUnitario) || 0;
