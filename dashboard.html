@@ -7,96 +7,164 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root {
-            --amarillo: #FFC107;
-            --amarillo-oscuro: #E0A800;
-            --negro: #1E1E1E;
-            --gris-claro: #F5F5F5;
-            --blanco: #FFFFFF;
-            --rojo: #DC3545;
-            --borde: #DDDDDD;
-            --radio: 8px;
-        }
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
-        body { background:var(--gris-claro); color:var(--negro); display:flex; min-height:100vh; }
-        .sidebar {
-            width:250px; background:var(--negro); color:white; display:flex; flex-direction:column;
-            padding:2rem 1rem; gap:2rem;
-        }
-        .logo-container { text-align:center; border-bottom:2px solid var(--amarillo); padding-bottom:1rem; }
-        .logo-container img { width:110px; height:auto; margin-bottom:0.5rem; }
-        .logo-container .empresa-nombre { font-weight:bold; font-size:1.2rem; color:var(--amarillo); letter-spacing:0.5px; }
-        .logo-container .empresa-sub { font-size:0.7rem; color:#bbb; letter-spacing:1px; margin-top:0.2rem; }
-        .sidebar nav { display:flex; flex-direction:column; gap:0.5rem; }
-        .sidebar nav button {
-            background:transparent; border:none; color:#ccc; padding:0.8rem 1rem;
-            text-align:left; font-size:1rem; border-radius:var(--radio); cursor:pointer;
-            transition:0.2s; font-weight:500;
-        }
-        .sidebar nav button:hover, .sidebar nav button.active { background:var(--amarillo); color:var(--negro); font-weight:bold; }
-        .main { flex:1; display:flex; flex-direction:column; }
-        .topbar {
-            background:white; padding:1rem 2rem; box-shadow:0 2px 8px rgba(0,0,0,0.1);
-            display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid var(--amarillo);
-            flex-wrap:wrap; gap:0.8rem;
-        }
-        .topbar-right { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap; }
-        .content { padding:2rem; flex:1; }
-        .card { background:white; border-radius:var(--radio); box-shadow:0 2px 12px rgba(0,0,0,0.08); padding:1.5rem; }
-        .table-wrapper { overflow-x:auto; }
-        table { width:100%; border-collapse:collapse; margin-top:1rem; min-width:800px; }
-        th { background:var(--negro); color:var(--amarillo); padding:12px 10px; font-weight:600; text-align:left; font-size:0.9rem; }
-        td { padding:10px; border-bottom:1px solid var(--borde); font-size:0.9rem; }
-        tr:hover td { background:#FFF8E1; }
-        .btn { padding:0.5rem 1rem; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.9rem; }
-        .btn-amarillo { background:var(--amarillo); color:var(--negro); }
-        .btn-amarillo:hover { background:var(--amarillo-oscuro); }
-        .btn-outline { background:white; border:1px solid var(--negro); color:var(--negro); }
-        .btn-outline:hover { background:#f0f0f0; }
-        .btn-danger { background:var(--rojo); color:white; }
-        .btn-sm { padding:0.3rem 0.7rem; font-size:0.8rem; }
-        .badge { display:inline-block; padding:0.3rem 0.8rem; border-radius:20px; font-size:0.8rem; font-weight:600; }
-        .badge-activo { background:#D4EDDA; color:#155724; }
-        .badge-devuelto { background:#F8D7DA; color:#721C24; }
-        .hidden { display:none; }
-        .modal {
-            display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-            background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;
-        }
-        .modal-content {
-            background:white; padding:2rem; border-radius:12px; width:90%; max-width:500px;
-            max-height:90vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3);
-        }
-        .modal-content h3 { margin-bottom:1rem; color:var(--negro); border-bottom:2px solid var(--amarillo); padding-bottom:0.5rem; }
-        .form-group { margin-bottom:1rem; text-align:left; }
-        .form-group label { display:block; font-weight:600; margin-bottom:0.3rem; }
-        .form-group input, .form-group select, .form-group textarea {
-            width:100%; padding:0.6rem; border:1px solid var(--borde); border-radius:6px; font-size:1rem;
-        }
-        .flex-end { display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem; }
-        .btn-config { background:transparent; border:1px dashed var(--amarillo); color:var(--amarillo); padding:0.3rem 0.6rem; font-size:0.8rem; }
-        .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem; }
-        .toolbar input[type="text"] { flex:1; min-width:200px; padding:0.6rem; border:1px solid #ddd; border-radius:6px; }
-        .toolbar-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
-        #login-overlay {
-            position:fixed; inset:0; background:var(--negro); z-index:2000;
-            display:flex; justify-content:center; align-items:center;
-        }
-        .login-box {
-            background:white; padding:2.5rem 2rem; border-radius:12px; width:90%; max-width:380px;
-            text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.4);
-        }
-        .login-box img { width:90px; margin-bottom:0.6rem; }
-        .login-box h2 { color:var(--negro); letter-spacing:0.5px; }
-        .login-box .sub { color:#888; font-size:0.8rem; margin-bottom:1.5rem; letter-spacing:1px; }
-        #login-error { display:none; color:var(--rojo); margin-top:0.8rem; font-size:0.9rem; }
-        #login-status { color:#888; font-size:0.85rem; margin-top:0.6rem; }
-        #config-warning {
-            display:none; position:fixed; top:0; left:0; right:0; background:var(--rojo); color:white;
-            text-align:center; padding:0.6rem; font-size:0.85rem; z-index:3000; font-weight:600;
-        }
-    </style>
+   <style>
+    :root {
+        --amarillo: #FFC107;
+        --amarillo-oscuro: #E0A800;
+        --negro: #1A1D23;
+        --negro-2: #232830;
+        --gris-claro: #F3F5F9;
+        --blanco: #FFFFFF;
+        --rojo: #E53935;
+        --texto: #1F2937;
+        --texto-suave: #6B7280;
+        --borde: #E5E7EB;
+        --radio: 12px;
+        --sombra-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+        --sombra-md: 0 4px 14px rgba(0,0,0,.08);
+        --sombra-lg: 0 10px 30px rgba(0,0,0,.15);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', -apple-system, Roboto, sans-serif; }
+    body { background:var(--gris-claro); color:var(--texto); display:flex; min-height:100vh; }
+
+    /* -------- SIDEBAR -------- */
+    .sidebar {
+        width:260px; background:linear-gradient(180deg, var(--negro), var(--negro-2)); color:white;
+        display:flex; flex-direction:column; padding:1.5rem 1rem; gap:1.5rem;
+        box-shadow:2px 0 12px rgba(0,0,0,.15);
+    }
+    .logo-container { text-align:center; border-bottom:1px solid rgba(255,193,7,.35); padding-bottom:1rem; }
+    .logo-container img { width:110px; height:auto; margin-bottom:0.5rem; filter: drop-shadow(0 4px 8px rgba(255,193,7,.25)); }
+    .logo-container .empresa-nombre { font-weight:800; font-size:1.25rem; color:var(--amarillo); letter-spacing:1px; }
+    .logo-container .empresa-sub { font-size:0.68rem; color:#9AA0AA; letter-spacing:1.5px; margin-top:0.2rem; }
+    .sidebar nav { display:flex; flex-direction:column; gap:0.35rem; }
+    .sidebar nav button {
+        background:transparent; border:none; color:#C9CDD4; padding:0.85rem 1rem;
+        text-align:left; font-size:0.95rem; border-radius:10px; cursor:pointer;
+        transition:all .18s ease; font-weight:500; display:flex; align-items:center; gap:.5rem;
+    }
+    .sidebar nav button:hover { background:rgba(255,193,7,.10); color:var(--amarillo); transform:translateX(3px); }
+    .sidebar nav button.active {
+        background:linear-gradient(135deg, var(--amarillo), var(--amarillo-oscuro));
+        color:var(--negro); font-weight:700;
+        box-shadow:0 4px 14px rgba(255,193,7,.35);
+    }
+
+    /* -------- LAYOUT -------- */
+    .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .topbar {
+        background:white; padding:1rem 2rem; box-shadow:var(--sombra-sm);
+        display:flex; justify-content:space-between; align-items:center;
+        border-bottom:3px solid var(--amarillo); flex-wrap:wrap; gap:0.8rem;
+        position:sticky; top:0; z-index:50;
+    }
+    .topbar h2 { font-size:1.4rem; font-weight:700; letter-spacing:-.3px; }
+    .topbar-right { display:flex; align-items:center; gap:0.9rem; flex-wrap:wrap; }
+    .content { padding:1.75rem; flex:1; }
+
+    /* -------- CARD -------- */
+    .card {
+        background:white; border-radius:var(--radio); box-shadow:var(--sombra-md);
+        padding:1.5rem; border:1px solid var(--borde);
+        transition: box-shadow .2s;
+    }
+
+    /* -------- TABLA -------- */
+    .table-wrapper { overflow-x:auto; border-radius:10px; }
+    table { width:100%; border-collapse:separate; border-spacing:0; margin-top:1rem; min-width:800px; }
+    th {
+        background:var(--negro); color:var(--amarillo); padding:12px 12px;
+        font-weight:600; text-align:left; font-size:0.82rem; letter-spacing:.4px;
+        text-transform:uppercase; white-space:nowrap;
+    }
+    th:first-child { border-top-left-radius:10px; }
+    th:last-child { border-top-right-radius:10px; }
+    td { padding:11px 12px; border-bottom:1px solid var(--borde); font-size:0.88rem; }
+    tr:hover td { background:#FFFBEB; }
+    tbody tr:last-child td { border-bottom:none; }
+
+    /* -------- BOTONES -------- */
+    .btn {
+        padding:0.55rem 1rem; border:none; border-radius:8px; font-weight:600;
+        cursor:pointer; font-size:0.88rem; transition:all .15s ease;
+        display:inline-flex; align-items:center; gap:.4rem;
+    }
+    .btn:active { transform:scale(.97); }
+    .btn-amarillo { background:linear-gradient(135deg, var(--amarillo), var(--amarillo-oscuro)); color:var(--negro); box-shadow:0 2px 6px rgba(255,193,7,.4); }
+    .btn-amarillo:hover { box-shadow:0 4px 12px rgba(255,193,7,.55); }
+    .btn-outline { background:white; border:1.5px solid var(--borde); color:var(--texto); }
+    .btn-outline:hover { background:#F9FAFB; border-color:#9CA3AF; }
+    .btn-danger { background:var(--rojo); color:white; }
+    .btn-danger:hover { background:#C62828; }
+    .btn-sm { padding:0.32rem 0.7rem; font-size:0.76rem; border-radius:6px; }
+
+    /* -------- BADGES -------- */
+    .badge { display:inline-block; padding:0.28rem 0.75rem; border-radius:20px; font-size:0.75rem; font-weight:700; letter-spacing:.3px; }
+    .badge-activo { background:#DCFCE7; color:#166534; }
+    .badge-devuelto { background:#FEE2E2; color:#991B1B; }
+
+    /* -------- MODAL -------- */
+    .hidden { display:none; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(3px); justify-content:center; align-items:center; z-index:1000; padding:1rem; }
+    .modal-content {
+        background:white; padding:1.75rem; border-radius:14px; width:90%; max-width:520px;
+        max-height:90vh; overflow-y:auto; box-shadow:var(--sombra-lg);
+        animation:modalIn .18s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:translateY(12px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+    .modal-content h3 { margin-bottom:1rem; color:var(--texto); border-bottom:2px solid var(--amarillo); padding-bottom:.6rem; font-size:1.15rem; }
+
+    /* -------- FORM -------- */
+    .form-group { margin-bottom:1rem; text-align:left; }
+    .form-group label { display:block; font-weight:600; margin-bottom:.35rem; font-size:.85rem; color:#374151; }
+    .form-group input, .form-group select, .form-group textarea {
+        width:100%; padding:0.65rem 0.8rem; border:1.5px solid var(--borde); border-radius:8px;
+        font-size:0.95rem; transition:border-color .15s, box-shadow .15s; background:#FCFCFD;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline:none; border-color:var(--amarillo); box-shadow:0 0 0 3px rgba(255,193,7,.18); background:white;
+    }
+
+    .flex-end { display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem; }
+    .btn-config { background:transparent; border:1px dashed rgba(255,193,7,.6); color:var(--amarillo); padding:0.45rem 0.7rem; font-size:0.78rem; border-radius:8px; cursor:pointer; }
+    .btn-config:hover { background:rgba(255,193,7,.08); }
+
+    /* -------- TOOLBAR -------- */
+    .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem; }
+    .toolbar input[type="text"] { flex:1; min-width:200px; padding:0.65rem 0.9rem; border:1.5px solid var(--borde); border-radius:8px; font-size:.9rem; transition:border-color .15s, box-shadow .15s; }
+    .toolbar input[type="text"]:focus { outline:none; border-color:var(--amarillo); box-shadow:0 0 0 3px rgba(255,193,7,.18); }
+    .toolbar-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
+
+    /* -------- LOGIN -------- */
+    #login-overlay { position:fixed; inset:0; background:linear-gradient(135deg, var(--negro), #0F1115); z-index:2000; display:flex; justify-content:center; align-items:center; }
+    .login-box {
+        background:white; padding:2.5rem 2rem; border-radius:16px; width:90%; max-width:380px;
+        text-align:center; box-shadow:var(--sombra-lg);
+    }
+    .login-box img { width:90px; margin-bottom:.6rem; }
+    .login-box h2 { color:var(--texto); letter-spacing:1px; font-weight:800; }
+    .login-box .sub { color:var(--texto-suave); font-size:.78rem; margin-bottom:1.5rem; letter-spacing:1.5px; }
+    #login-error { display:none; color:var(--rojo); margin-top:.8rem; font-size:.88rem; }
+    #login-status { color:var(--texto-suave); font-size:.82rem; margin-top:.6rem; }
+    #config-warning {
+        display:none; position:fixed; top:0; left:0; right:0; background:var(--rojo); color:white;
+        text-align:center; padding:0.6rem; font-size:.85rem; z-index:3000; font-weight:600;
+    }
+
+    /* -------- ESCANER -------- */
+    #lector-qr { border-radius:12px; overflow:hidden; box-shadow:var(--sombra-md); background:#000; }
+    #escaner-feedback { padding:0.9rem; border-radius:10px; margin:.5rem 0; text-align:center; font-weight:600; box-shadow:var(--sombra-sm); }
+    #controles-camara { padding:.5rem 0; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .sidebar { width:80px; padding:1rem 0.4rem; }
+        .logo-container .empresa-nombre, .logo-container .empresa-sub { display:none; }
+        .sidebar nav button { font-size:.75rem; padding:.6rem .5rem; flex-direction:column; text-align:center; }
+        .content { padding:1rem; }
+        .topbar { padding:.8rem 1rem; }
+    }
+</style>
 </head>
 <body>
 
@@ -161,35 +229,51 @@
             </div>
         </div>
         <!-- Vista Escanear -->
-        <div id="view-escanear" class="view hidden">
-            <div class="card">
-                <div class="form-group">
-                    <label>1. Selecciona al colaborador que va a recibir</label>
-                    <select id="escaner-usuario">
-                        <option value="">-- Selecciona un colaborador --</option>
-                    </select>
-                </div>
-                <div id="escaner-panel" style="display:none;">
-                    <div class="toolbar" style="margin-top:1rem;">
-                        <button class="btn btn-amarillo" id="btn-iniciar-escaner">📷 Iniciar cámara</button>
-                        <button class="btn btn-outline" id="btn-detener-escaner" style="display:none;">⏹️ Detener cámara</button>
-                        <button class="btn btn-outline" id="btn-mueble-sin-serie">➕ Registrar mueble sin número de serie</button>
-                    </div>
-                    <div id="lector-qr" style="width:100%; max-width:650px; margin:1rem auto;"></div>
-                    <p id="escaner-estado" style="text-align:center; color:#666;"></p>
-                    <div class="card" style="background:#FFF8E1; margin-top:1rem;">
-                        <h3 style="margin-bottom:0.6rem;">Entregado en esta sesión a <span id="escaner-nombre-usuario"></span></h3>
-                        <table style="width:100%;">
-                            <thead><tr><th>Código</th><th>Descripción</th><th>Hora</th></tr></thead>
-                            <tbody id="escaner-tabla-sesion"></tbody>
-                        </table>
-                        <div class="flex-end" style="margin-top:1rem;">
-                            <button class="btn btn-amarillo" id="btn-generar-cargo-escaner">📋 Generar Cargo de Bienes (Word)</button>
-                        </div>
-                    </div>
+<div id="view-escanear" class="view hidden">
+    <div class="card">
+        <div class="form-group">
+            <label>1. Selecciona al colaborador que va a recibir</label>
+            <select id="escaner-usuario"><option value="">-- Selecciona --</option></select>
+        </div>
+
+        <div id="escaner-panel" style="display:none;">
+            <div class="toolbar" style="margin-top:1rem; flex-wrap:wrap; gap:.5rem;">
+                <button class="btn btn-amarillo" id="btn-iniciar-escaner">📷 Iniciar cámara</button>
+                <button class="btn btn-outline" id="btn-detener-escaner" style="display:none;">⏹️ Detener</button>
+                <button class="btn btn-amarillo" id="btn-capturar-frame" style="display:none;">📸 Capturar y leer</button>
+                <button class="btn btn-amarillo" id="btn-foto-nativa">📱 Tomar Foto (cámara del celular)</button>
+                <input type="file" id="input-foto-nativa" accept="image/*" capture="environment" style="display:none;">
+                <button class="btn btn-outline" id="btn-agregar-sin-serie">➕ Agregar item sin serie</button>
+            </div>
+
+            <div class="toolbar" style="margin-top:.6rem; gap:.5rem;">
+                <input type="text" id="input-codigo-manual"
+                       placeholder="O escribe el código / N° de serie y Enter…"
+                       style="flex:1; min-width:220px; padding:.7rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+                <button class="btn btn-amarillo" id="btn-procesar-manual">🔍 Procesar</button>
+            </div>
+
+            <div id="lector-qr" style="width:100%; max-width:680px; margin:1rem auto; border-radius:12px; overflow:hidden; background:#000;"></div>
+            <div id="lector-foto-nativa" style="display:none;"></div>
+            <div id="controles-camara" style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.5rem; align-items:center;"></div>
+            <p id="escaner-estado" style="text-align:center; color:#666; min-height:1.4em;"></p>
+            <div id="escaner-feedback" style="display:none; padding:.9rem; border-radius:10px; margin:.5rem 0; text-align:center; font-weight:600;"></div>
+
+            <div class="card" style="background:#FFFBEB; margin-top:1rem; border:1px solid #FDE68A;">
+                <h3 style="margin-bottom:.6rem;">📋 Items verificados para <span id="escaner-nombre-usuario"></span></h3>
+                <p style="color:#6B7280; font-size:.85rem; margin-bottom:.6rem;">Estos son los bienes que se incluirán en el Formato de Entrega.</p>
+                <table style="width:100%;">
+                    <thead><tr><th>Código</th><th>Descripción</th><th>Serie</th><th></th></tr></thead>
+                    <tbody id="escaner-tabla-sesion"></tbody>
+                </table>
+                <div class="flex-end" style="margin-top:1rem; flex-wrap:wrap;">
+                    <button class="btn btn-outline" id="btn-vaciar-sesion">🗑️ Vaciar lista</button>
+                    <button class="btn btn-amarillo" id="btn-generar-cargo-escaner">📋 Generar Formato de Entrega</button>
                 </div>
             </div>
         </div>
+    </div>
+</div>
         <!-- Vista Productos -->
         <div id="view-productos" class="view hidden">
             <div class="card">
@@ -1245,7 +1329,7 @@
             const html = `
                 ${asig.urlVale ? `<p>📄 Vale de salida: <a href="${asig.urlVale}" target="_blank">Ver archivo</a></p>` : '<p style="color:#888;">Sin vale de salida cargado.</p>'}
                 ${asig.urlFoto ? `<p>📷 Foto de entrega:</p><img src="${asig.urlFoto}" style="max-width:100%; border-radius:6px; margin-bottom:0.5rem;">` : '<p style="color:#888;">Sin foto de entrega cargada.</p>'}
-                <div class="form-group" style="margin-top:1rem;"><label>Subir / reemplazar vale de salida</label><input type="file" id="ev-vale" accept="image/*,.pdf"></div>
+                <div class="form-group" style="margin-top:1rem;"><label>Subir / reemplazar vale de salida</label><input type="file" id="ev-vale" accept="application/pdf,.pdf"></div>
                 <div class="form-group"><label>Subir / reemplazar foto de entrega</label><input type="file" id="ev-foto" accept="image/*" capture="environment"></div>
             `;
             abrirModal(`Evidencia - Asignación #${asig.id}`, html, async () => {
@@ -1296,302 +1380,694 @@
         } catch (e) { return ''; }
     }
 
-    // ==================== ESCANEAR Y ENTREGAR ====================
-    let sesionEscaneo = { usuario: null, items: [] };
-    let html5QrCodeInstance = null;
-    let ultimoCodigoEscaneado = null;
-    let ultimoTiempoEscaneado = 0;
+   // ==================== ESCANEAR Y ENTREGAR v4 ====================
+let sesionEscaneo = { usuario: null, items: [] };
+let html5QrCodeInstance = null;
+let ultimoCodigoEscaneado = null;
+let ultimoTiempoEscaneado = 0;
+let escaneoActivo = false;
+let camaraTrack = null;
 
-    document.getElementById('escaner-usuario').addEventListener('change', () => {
-        const dni = document.getElementById('escaner-usuario').value;
-        const panel = document.getElementById('escaner-panel');
-        if (!dni) { panel.style.display = 'none'; return; }
-        const usr = data.usuarios.find(u => u.dni === dni);
-        sesionEscaneo = { usuario: usr, items: [] };
-        document.getElementById('escaner-nombre-usuario').textContent = usr.nombre;
-        document.getElementById('escaner-tabla-sesion').innerHTML = '';
-        document.getElementById('escaner-estado').textContent = '';
-        panel.style.display = 'block';
+// ---- Sonido / vibración / feedback ----
+function sonidoOK() { try { const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=1200; o.type='sine'; g.gain.setValueAtTime(.25,c.currentTime); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.15); o.start(); o.stop(c.currentTime+.15);} catch(e){} }
+function sonidoError() { try { const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(),g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=350; o.type='sawtooth'; g.gain.setValueAtTime(.25,c.currentTime); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35); o.start(); o.stop(c.currentTime+.35);} catch(e){} }
+function vibrar(p) { if (navigator.vibrate) navigator.vibrate(p); }
+function feedback(tipo, msg) {
+    const el = document.getElementById('escaner-feedback'); if (!el) return;
+    el.style.display = 'block'; el.textContent = msg;
+    el.style.background = tipo==='ok'?'#DCFCE7':tipo==='warn'?'#FEF3C7':'#FEE2E2';
+    el.style.color      = tipo==='ok'?'#166534':tipo==='warn'?'#92400E':'#991B1B';
+    setTimeout(()=>{ el.style.display='none'; }, 6000);
+}
+
+function normalizarCodigo(c) { return String(c||'').trim().toUpperCase().replace(/[\s\-_]/g,''); }
+
+function buscarProductoPorCodigo(codigo) {
+    const obj = normalizarCodigo(codigo);
+    if (!obj) return null;
+    let p = data.productos.find(x => normalizarCodigo(x.codigo) === obj); if (p) return p;
+    p = data.productos.find(x => x.numeroSerie && normalizarCodigo(x.numeroSerie) === obj); if (p) return p;
+    p = data.productos.find(x => x.imei && normalizarCodigo(x.imei) === obj); if (p) return p;
+    try {
+        if (codigo.includes('codigo=')) {
+            const url = new URL(codigo, window.location.origin);
+            const cod = url.searchParams.get('codigo');
+            if (cod) return data.productos.find(x => normalizarCodigo(x.codigo) === normalizarCodigo(cod));
+        }
+    } catch(e) {}
+    p = data.productos.find(x => obj.includes(normalizarCodigo(x.codigo)) && x.codigo.length >= 4); if (p) return p;
+    p = data.productos.find(x => x.numeroSerie && x.numeroSerie.length >= 5 && obj.includes(normalizarCodigo(x.numeroSerie)));
+    return p || null;
+}
+
+document.getElementById('escaner-usuario').addEventListener('change', () => {
+    const dni = document.getElementById('escaner-usuario').value;
+    const panel = document.getElementById('escaner-panel');
+    if (!dni) { panel.style.display = 'none'; return; }
+    const usr = data.usuarios.find(u => u.dni === dni);
+    sesionEscaneo = { usuario: usr, items: [] };
+    document.getElementById('escaner-nombre-usuario').textContent = usr.nombre;
+    document.getElementById('escaner-tabla-sesion').innerHTML = '';
+    document.getElementById('escaner-estado').textContent = '';
+    document.getElementById('escaner-feedback').style.display = 'none';
+    panel.style.display = 'block';
+});
+
+let html5QrcodeLibCargada = false;
+function cargarLibreriaEscaneo() {
+    return new Promise((resolve, reject) => {
+        if (html5QrcodeLibCargada || window.Html5Qrcode) { html5QrcodeLibCargada = true; resolve(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        s.onload = () => { html5QrcodeLibCargada = true; resolve(); };
+        s.onerror = () => reject(new Error('No se pudo cargar la librería de escaneo.'));
+        document.head.appendChild(s);
+    });
+}
+
+document.getElementById('btn-iniciar-escaner').addEventListener('click', async () => {
+    if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+    const estado = document.getElementById('escaner-estado');
+    estado.textContent = 'Cargando el lector…';
+    try { await cargarLibreriaEscaneo(); } catch(e) { alert(e.message); return; }
+
+    const formatos = [
+        Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODABAR, Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.DATA_MATRIX, Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.AZTEC
+    ];
+    document.getElementById('lector-qr').innerHTML = '';
+    html5QrCodeInstance = new Html5Qrcode('lector-qr', {
+        formatsToSupport: formatos,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        verbose: false
+    });
+    try {
+        await html5QrCodeInstance.start(
+            { facingMode: 'environment' },
+            {
+                fps: 20,
+                qrbox: (w,h) => ({ width: Math.floor(w*0.96), height: Math.floor(h*0.35) }),
+                aspectRatio: 1.777,
+                disableFlip: false,
+                videoConstraints: {
+                    facingMode: 'environment',
+                    width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 },
+                    focusMode: 'continuous', advanced: [{ focusMode: 'continuous' }]
+                }
+            },
+            onCodigoEscaneado, () => {}
+        );
+        escaneoActivo = true;
+        const video = document.querySelector('#lector-qr video');
+        if (video && video.srcObject) {
+            camaraTrack = video.srcObject.getVideoTracks()[0];
+            configurarZoomLinterna();
+        }
+        document.getElementById('btn-iniciar-escaner').style.display = 'none';
+        document.getElementById('btn-detener-escaner').style.display = 'inline-block';
+        document.getElementById('btn-capturar-frame').style.display = 'inline-block';
+        estado.textContent = '📷 Apunta al código. Si no lee, pulsa "📸 Capturar y leer".';
+    } catch(e) { alert('No se pudo iniciar la cámara. ' + e); }
+});
+
+async function configurarZoomLinterna() {
+    if (!camaraTrack) return;
+    const caps = camaraTrack.getCapabilities ? camaraTrack.getCapabilities() : {};
+    const wrap = document.getElementById('controles-camara'); wrap.innerHTML = '';
+    if (caps.torch) {
+        const btn = document.createElement('button'); btn.className='btn btn-outline btn-sm'; btn.textContent='🔦 Linterna';
+        let on = false;
+        btn.onclick = async () => { on=!on; try{ await camaraTrack.applyConstraints({advanced:[{torch:on}]}); }catch(e){} btn.textContent = on?'🔦 ON':'🔦 Linterna'; };
+        wrap.appendChild(btn);
+    }
+    if (caps.zoom) {
+        const minZ = caps.zoom.min||1, maxZ = caps.zoom.max||4;
+        const sl = document.createElement('input'); sl.type='range'; sl.min=minZ; sl.max=maxZ; sl.step=0.1; sl.value=minZ;
+        sl.style.cssText='flex:1; min-width:120px;';
+        sl.oninput = async () => { try{ await camaraTrack.applyConstraints({advanced:[{zoom:parseFloat(sl.value)}]}); }catch(e){} };
+        wrap.appendChild(sl);
+    }
+}
+
+document.getElementById('btn-capturar-frame').addEventListener('click', async () => {
+    const video = document.querySelector('#lector-qr video');
+    if (!video || !video.videoWidth) { alert('Cámara aún no lista.'); return; }
+    const estado = document.getElementById('escaner-estado'); estado.textContent = '⏳ Procesando…';
+    const canvas = document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
+    try {
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        for (let i=0;i<img.data.length;i+=4){
+            const g = 0.299*img.data[i]+0.587*img.data[i+1]+0.114*img.data[i+2];
+            const v = g<110?0:g>160?255:g;
+            img.data[i]=img.data[i+1]=img.data[i+2]=v;
+        }
+        ctx.putImageData(img,0,0);
+    } catch(e) {}
+    const blob = await new Promise(r => canvas.toBlob(r,'image/jpeg',.98));
+    const file = new File([blob],'captura.jpg',{type:'image/jpeg'});
+    let resultado = null;
+    for (const rec of [null, {x:0,y:.30,w:1,h:.40}, {x:.05,y:.40,w:.90,h:.20}]) {
+        try {
+            let archivo = file;
+            if (rec) {
+                const c2 = document.createElement('canvas'); c2.width=canvas.width*rec.w; c2.height=canvas.height*rec.h;
+                c2.getContext('2d').drawImage(canvas, canvas.width*rec.x, canvas.height*rec.y, canvas.width*rec.w, canvas.height*rec.h, 0,0,c2.width,c2.height);
+                const b2 = await new Promise(r => c2.toBlob(r,'image/jpeg',.98));
+                archivo = new File([b2],'rec.jpg',{type:'image/jpeg'});
+            }
+            resultado = await html5QrCodeInstance.scanFile(archivo, false);
+            break;
+        } catch(e){}
+    }
+    if (resultado) { estado.textContent='✅ Leído'; onCodigoEscaneado(resultado); }
+    else { sonidoError(); vibrar([100,40,100]); feedback('error','❌ No se pudo leer. Acércate, mejora la luz o usa linterna.'); estado.textContent='Reintenta.'; }
+});
+
+document.getElementById('btn-foto-nativa').addEventListener('click', () => {
+    if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+    document.getElementById('input-foto-nativa').click();
+});
+
+document.getElementById('input-foto-nativa').addEventListener('change', async (e) => {
+    const archivoOriginal = e.target.files[0];
+    if (!archivoOriginal) return;
+    const estado = document.getElementById('escaner-estado');
+    estado.textContent = '⏳ Leyendo la foto…';
+
+    try { await cargarLibreriaEscaneo(); } catch (err) { alert(err.message); return; }
+
+    const formatos = [
+        Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODABAR, Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.DATA_MATRIX, Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.AZTEC
+    ];
+    const lectorFoto = new Html5Qrcode('lector-foto-nativa', {
+        formatsToSupport: formatos,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        verbose: false
     });
 
-    let html5QrcodeLibCargada = false;
-    function cargarLibreriaEscaneo() {
-        return new Promise((resolve, reject) => {
-            if (html5QrcodeLibCargada || window.Html5Qrcode) { html5QrcodeLibCargada = true; resolve(); return; }
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
-            script.onload = () => { html5QrcodeLibCargada = true; resolve(); };
-            script.onerror = () => reject(new Error('No se pudo cargar la librería de escaneo. Revisa tu conexión a internet.'));
-            document.head.appendChild(script);
-        });
+    // Carga la foto en un canvas para poder reintentar con contraste mejorado si hace falta
+    const bitmap = await createImageBitmap(archivoOriginal).catch(() => null);
+    let resultado = null;
+
+    // Intento 1: la foto tal cual la tomó la cámara nativa
+    try {
+        resultado = await lectorFoto.scanFile(archivoOriginal, false);
+    } catch (err) { /* seguimos al intento 2 */ }
+
+    // Intento 2: si falló, aplicar blanco y negro con contraste (igual que en Capturar y leer)
+    if (!resultado && bitmap) {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width; canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0);
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < img.data.length; i += 4) {
+                const g = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
+                const v = g < 110 ? 0 : g > 160 ? 255 : g;
+                img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+            }
+            ctx.putImageData(img, 0, 0);
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.98));
+            const archivoMejorado = new File([blob], 'foto_mejorada.jpg', { type: 'image/jpeg' });
+            resultado = await lectorFoto.scanFile(archivoMejorado, false);
+        } catch (err) { /* tampoco se pudo */ }
     }
 
-    document.getElementById('btn-iniciar-escaner').addEventListener('click', async () => {
-        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
-        const estado = document.getElementById('escaner-estado');
-        estado.textContent = 'Cargando el lector de cámara...';
-        try {
-            await cargarLibreriaEscaneo();
-        } catch (e) {
-            alert(e.message);
-            estado.textContent = '';
+    try { await lectorFoto.clear(); } catch (err) { /* nada que limpiar */ }
+    e.target.value = ''; // permite tomar otra foto del mismo item si hace falta
+
+    if (resultado) {
+        estado.textContent = '✅ Leído desde la foto';
+        onCodigoEscaneado(resultado);
+    } else {
+        sonidoError(); vibrar([100, 40, 100]);
+        feedback('error', '❌ No se pudo leer esa foto. Acércate más, evita reflejos de luz, o escribe el código a mano abajo.');
+        estado.textContent = 'Intenta con otra foto o escribe el código manualmente.';
+    }
+});
+
+document.getElementById('btn-detener-escaner').addEventListener('click', async () => {
+    escaneoActivo = false;
+    if (html5QrCodeInstance) { try { await html5QrCodeInstance.stop(); html5QrCodeInstance.clear(); } catch(e){} html5QrCodeInstance=null; }
+    camaraTrack = null;
+    document.getElementById('lector-qr').innerHTML = '';
+    document.getElementById('controles-camara').innerHTML = '';
+    document.getElementById('btn-iniciar-escaner').style.display='inline-block';
+    document.getElementById('btn-detener-escaner').style.display='none';
+    document.getElementById('btn-capturar-frame').style.display='none';
+    document.getElementById('escaner-estado').textContent='';
+});
+
+document.getElementById('btn-procesar-manual').addEventListener('click', () => {
+    const v = document.getElementById('input-codigo-manual').value.trim();
+    if (!v) return;
+    onCodigoEscaneado(v);
+    document.getElementById('input-codigo-manual').value = '';
+});
+document.getElementById('input-codigo-manual').addEventListener('keydown', e => {
+    if (e.key==='Enter') { e.preventDefault(); document.getElementById('btn-procesar-manual').click(); }
+});
+document.getElementById('btn-vaciar-sesion').addEventListener('click', () => {
+    if (!sesionEscaneo.items.length) return;
+    if (!confirm('¿Vaciar la lista?')) return;
+    sesionEscaneo.items = [];
+    document.getElementById('escaner-tabla-sesion').innerHTML = '';
+});
+
+function agregarItemALista(item) {
+    if (sesionEscaneo.items.some(i => i.codigo === item.codigo)) {
+        feedback('warn', `⚠️ "${item.descripcion}" ya está en la lista.`);
+        return false;
+    }
+    sesionEscaneo.items.push(item);
+    const tbody = document.getElementById('escaner-tabla-sesion');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${item.codigo}</td><td>${item.descripcion}</td><td>${item.numeroSerie||'S/M'}</td>
+        <td><button class="btn btn-danger btn-sm">✕</button></td>`;
+    tr.querySelector('button').onclick = () => {
+        sesionEscaneo.items = sesionEscaneo.items.filter(i => i.codigo !== item.codigo);
+        tr.remove();
+    };
+    tbody.appendChild(tr);
+    return true;
+}
+
+async function onCodigoEscaneado(texto) {
+    if (!sesionEscaneo.usuario) return;
+    const codigo = String(texto||'').trim(); if (!codigo) return;
+    const ahora = Date.now();
+    if (codigo === ultimoCodigoEscaneado && (ahora - ultimoTiempoEscaneado) < 3000) return;
+    ultimoCodigoEscaneado = codigo; ultimoTiempoEscaneado = ahora;
+
+    const prod = buscarProductoPorCodigo(codigo);
+    if (prod) {
+        const ok = agregarItemALista({
+            codigo: prod.codigo,
+            descripcion: prod.descripcion,
+            numeroSerie: prod.numeroSerie || '',
+            observacion: ''
+        });
+        if (ok) {
+            sonidoOK(); vibrar(80);
+            feedback('ok', `✅ "${prod.descripcion}" agregado.`);
+        }
+    } else {
+        sonidoError(); vibrar([100,50,100]);
+        feedback('error', `❌ No está registrado: ${codigo}`);
+        if (confirm(`El código "${codigo}" NO está en la BD.\n\n¿Deseas registrarlo como equipo NUEVO?`)) {
+            abrirModalRegistrarItem(codigo);
+        }
+    }
+}
+
+// ---- Familias para generar códigos internos ----
+const FAMILIAS = {
+    'LAP': 'Laptop', 'MON': 'Monitor', 'TAB': 'Tablet', 'CEL': 'Celular',
+    'CPU': 'CPU', 'IMP': 'Impresora', 'PRO': 'Proyector', 'ACC': 'Accesorio',
+    'MEM': 'Memoria', 'ESC': 'Escritorio', 'SIL': 'Silla', 'EST': 'Estantería',
+    'RAC': 'Rack', 'ALM': 'Anaquel/Andamio', 'AUX': 'Equipo auxiliar',
+    'PAR': 'Parlante', 'ALC': 'Alcoholímetro', 'TOR': 'Detector de tormenta',
+    'TOP': 'Estación topográfica', 'MOB': 'Mobiliario'
+};
+
+document.getElementById('btn-agregar-sin-serie').addEventListener('click', () => {
+    if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+    abrirModalRegistrarItem('');
+});
+
+function abrirModalRegistrarItem(codigoInicial) {
+    const opcionesFamilia = Object.entries(FAMILIAS)
+        .map(([k,v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
+    abrirModal('Registrar nuevo item', `
+        ${codigoInicial ? `<p style="color:#92400E; background:#FEF3C7; padding:.5rem; border-radius:6px; margin-bottom:.8rem;">Código escaneado: <b>${codigoInicial}</b></p>` : ''}
+        <div class="form-group"><label>Familia / Tipo *</label><select id="new-familia">${opcionesFamilia}</select></div>
+        <div class="form-group"><label>Descripción *</label><input type="text" id="new-descripcion" placeholder="Ej: Monitor LED 24 pulgadas"></div>
+        <div class="form-group"><label>Marca</label><input type="text" id="new-marca"></div>
+        <div class="form-group"><label>Modelo</label><input type="text" id="new-modelo"></div>
+        <div class="form-group"><label>N° de Serie</label><input type="text" id="new-serie" value="${codigoInicial && !codigoInicial.match(/^[A-Z]{3}\d{4,}$/i) ? codigoInicial : ''}"></div>
+        <div class="form-group"><label>Condición</label><select id="new-condicion"><option>Nuevo</option><option selected>Usado</option></select></div>
+    `, async () => {
+        const familia = document.getElementById('new-familia').value;
+        const descripcion = obtenerValor('new-descripcion');
+        if (!descripcion) { alert('La descripción es obligatoria.'); return; }
+
+        const prefijo = familia;
+        const existentes = data.productos
+            .filter(p => p.codigo.toUpperCase().startsWith(prefijo))
+            .map(p => parseInt(p.codigo.substring(prefijo.length)) || 0);
+        const siguiente = (existentes.length ? Math.max(...existentes) : 0) + 1;
+        const codigo = `${prefijo}${String(siguiente).padStart(4, '0')}`;
+
+        const nuevo = {
+            codigo, categoria: '',
+            descripcion,
+            marca: obtenerValor('new-marca'),
+            modelo: obtenerValor('new-modelo'),
+            numeroSerie: obtenerValor('new-serie'),
+            imei: '', color: '',
+            condicion: obtenerValor('new-condicion'),
+            estadoFuncional: 'Operativo', accesorios: '',
+            moneda: 'PEN', precioUnitario: 0
+        };
+        const { error } = await sb.from('productos').insert({
+            codigo: nuevo.codigo, categoria: nuevo.categoria, descripcion: nuevo.descripcion,
+            marca: nuevo.marca, modelo: nuevo.modelo, numero_serie: nuevo.numeroSerie,
+            imei: nuevo.imei, color: nuevo.color, condicion: nuevo.condicion,
+            estado_funcional: nuevo.estadoFuncional, accesorios: nuevo.accesorios,
+            moneda: nuevo.moneda, precio_unitario: nuevo.precioUnitario
+        });
+        if (error) { alert('Error al guardar: ' + error.message); return; }
+        data.productos.push(nuevo);
+        agregarItemALista({ codigo: nuevo.codigo, descripcion: nuevo.descripcion, numeroSerie: nuevo.numeroSerie, observacion: '' });
+        sonidoOK(); vibrar(80);
+        feedback('ok', `✅ Registrado como ${codigo}.`);
+    });
+}
+
+document.getElementById('btn-generar-cargo-escaner').addEventListener('click', () => {
+    if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
+    if (!sesionEscaneo.items.length) { alert('Escanea al menos un item.'); return; }
+    abrirRevisionCargo();
+});
+
+// ==================== REVISIÓN + GENERAR FORMATO DE ENTREGA ====================
+async function abrirRevisionCargo() {
+    const numSugerido = await siguienteNumero('cargo_patrimonio');
+    const numeroDefault = numSugerido !== null ? String(numSugerido) : '';
+
+    const filas = sesionEscaneo.items.map((it, i) => {
+        const p = obtenerProducto(it.codigo);
+        return `<tr data-codigo="${it.codigo}">
+            <td>${i+1}</td>
+            <td>${it.codigo}</td>
+            <td>${p?.descripcion || it.descripcion}</td>
+            <td>${p?.numeroSerie || it.numeroSerie || 'S/M'}</td>
+            <td><input type="text" class="obs-item" data-codigo="${it.codigo}" value="${it.observacion||''}" style="width:100%; padding:.3rem; border:1px solid #E5E7EB; border-radius:4px; font-size:.85rem;"></td>
+            <td><button class="btn btn-danger btn-sm quitar-item" data-codigo="${it.codigo}">✕</button></td>
+        </tr>`;
+    }).join('');
+
+    const modal = document.getElementById('modal');
+    const body = document.getElementById('modal-body');
+    body.style.maxWidth = '900px';
+    body.innerHTML = `
+        <h3>📋 Revisar Formato de Entrega</h3>
+        <p style="color:#6B7280; font-size:.9rem; margin-bottom:1rem;">
+            Colaborador: <b>${sesionEscaneo.usuario.nombre}</b> — DNI ${sesionEscaneo.usuario.dni}
+        </p>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <div class="form-group" style="flex:1; min-width:140px;">
+                <label>N° de Cargo</label>
+                <input type="text" id="cargo-numero" value="${numeroDefault}"
+                       style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+                <small style="color:#6B7280; font-size:.75rem;">Sugerido: ${numeroDefault || 'sin dato'}. Puedes cambiarlo.</small>
+            </div>
+            <div class="form-group" style="flex:1; min-width:140px;">
+                <label>Fecha</label>
+                <input type="date" id="cargo-fecha" value="${new Date().toISOString().slice(0,10)}"
+                       style="padding:.6rem; border:1.5px solid #E5E7EB; border-radius:8px; font-size:1rem;">
+            </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;">#</th>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;">Código</th>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;">Descripción</th>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;">N° Serie</th>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;">Observación</th>
+                        <th style="background:#1A1D23; color:#FFC107; padding:8px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="cargo-items-body">${filas}</tbody>
+            </table>
+        </div>
+
+        <div class="flex-end" style="margin-top:1rem; flex-wrap:wrap;">
+            <button class="btn btn-outline" id="btn-agregar-durante-rev">➕ Agregar item</button>
+            <button class="btn btn-outline" id="btn-cancelar-rev">Cancelar</button>
+            <button class="btn btn-amarillo" id="btn-confirmar-generar">✅ Generar Formato y Actualizar</button>
+        </div>
+    `;
+    modal.style.display = 'flex';
+
+    body.querySelectorAll('.quitar-item').forEach(b => {
+        b.onclick = () => {
+            const cod = b.dataset.codigo;
+            sesionEscaneo.items = sesionEscaneo.items.filter(i => i.codigo !== cod);
+            b.closest('tr').remove();
+        };
+    });
+    body.querySelectorAll('.obs-item').forEach(inp => {
+        inp.oninput = () => {
+            const it = sesionEscaneo.items.find(i => i.codigo === inp.dataset.codigo);
+            if (it) it.observacion = inp.value;
+        };
+    });
+    document.getElementById('btn-cancelar-rev').onclick = () => { modal.style.display = 'none'; body.style.maxWidth = ''; };
+    document.getElementById('btn-agregar-durante-rev').onclick = () => { modal.style.display = 'none'; abrirModalRegistrarItem(''); setTimeout(()=>abrirRevisionCargo(), 50); };
+    document.getElementById('btn-confirmar-generar').onclick = async () => {
+        const numero = document.getElementById('cargo-numero').value.trim() || 'SIN-N°';
+        const fecha  = document.getElementById('cargo-fecha').value;
+        await confirmarYGenerar(numero, fecha);
+    };
+}
+
+async function confirmarYGenerar(numero, fecha) {
+    const usr = sesionEscaneo.usuario;
+    const modal = document.getElementById('modal');
+    const btn = document.getElementById('btn-confirmar-generar');
+    btn.disabled = true; btn.textContent = '⏳ Procesando…';
+
+    try {
+        for (const it of sesionEscaneo.items) {
+            const prev = data.asignaciones.find(a => a.codigoProducto === it.codigo && a.estado === 'Activo');
+            if (prev) {
+                await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', prev.id);
+                prev.estado = 'Devuelto';
+            }
+            const nueva = {
+                codigo_producto: it.codigo,
+                dni_usuario: usr.dni,
+                fecha: fecha || new Date().toISOString().slice(0,10),
+                encargado: sesion.nombre,
+                estado: 'Activo',
+                observaciones: it.observacion || ''
+            };
+            const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
+            if (!error) data.asignaciones.push(asignacionDesdeFila(fila));
+        }
+
+        await generarCargoDeEntregaV2(usr, numero, fecha);
+
+        modal.style.display = 'none';
+        document.getElementById('modal-body').style.maxWidth = '';
+
+        if (confirm('✅ Formato generado y asignaciones actualizadas.\n\n¿Deseas subir ahora el PDF escaneado y firmado?')) {
+            abrirModalSubirPDFCargo(usr);
+        }
+        sesionEscaneo.items = [];
+        document.getElementById('escaner-tabla-sesion').innerHTML = '';
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '✅ Generar Formato y Actualizar';
+    }
+}
+
+// ---- Modal: subir PDF escaneado ----
+function abrirModalSubirPDFCargo(usr) {
+    abrirModal('Subir PDF escaneado del formato firmado', `
+        <p style="color:#6B7280; margin-bottom:.8rem;">
+            Sube el <b>PDF escaneado</b> del Formato de Entrega ya firmado por <b>${usr.nombre}</b>.<br>
+            <small>⚠️ Solo archivos PDF (no fotos).</small>
+        </p>
+        <div class="form-group">
+            <label>Archivo PDF *</label>
+            <input type="file" id="pdf-firmado" accept="application/pdf,.pdf">
+        </div>
+        <div class="form-group">
+            <label>N° de Cargo</label>
+            <input type="text" id="pdf-numero" placeholder="Ej: 24">
+        </div>
+    `, async () => {
+        const file = document.getElementById('pdf-firmado').files[0];
+        if (!file) { alert('Selecciona un PDF.'); return; }
+        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+            alert('❌ Solo se aceptan archivos PDF escaneados. No fotos.');
             return;
         }
-        const formatos = [
-            Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E
-        ];
-        // formatsToSupport y useBarCodeDetectorIfSupported van en el CONSTRUCTOR, no en start()
-        html5QrCodeInstance = new Html5Qrcode('lector-qr', {
-            formatsToSupport: formatos,
-            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-            verbose: false
-        });
-        try {
-            await html5QrCodeInstance.start(
-                { facingMode: 'environment' },
-                {
-                    fps: 15,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const ancho = Math.floor(viewfinderWidth * 0.9);
-                        const alto = Math.floor(viewfinderHeight * 0.4);
-                        return { width: ancho, height: alto };
-                    },
-                    videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-                },
-                onCodigoEscaneado,
-                () => { /* ignorar errores de lectura silenciosos */ }
-            );
-            document.getElementById('btn-iniciar-escaner').style.display = 'none';
-            document.getElementById('btn-detener-escaner').style.display = 'inline-block';
-            estado.textContent = 'Cámara activa — apunta al código de barras o QR del equipo.';
-        } catch (e) {
-            alert('No se pudo iniciar la cámara. Verifica los permisos del navegador. Detalle: ' + e);
+        const url = await subirEvidencia(file, `cargo_firmado_${usr.dni}`);
+        if (!url) return;
+        const activas = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo');
+        for (const a of activas) {
+            await sb.from('asignaciones').update({ url_vale: url }).eq('id', a.id);
+            a.urlVale = url;
         }
+        alert('✅ PDF escaneado guardado en las asignaciones del colaborador.');
     });
+}
 
-    document.getElementById('btn-detener-escaner').addEventListener('click', async () => {
-        if (html5QrCodeInstance) {
-            try { await html5QrCodeInstance.stop(); html5QrCodeInstance.clear(); } catch (e) { /* ya estaba detenida */ }
-        }
-        document.getElementById('btn-iniciar-escaner').style.display = 'inline-block';
-        document.getElementById('btn-detener-escaner').style.display = 'none';
-        document.getElementById('escaner-estado').textContent = '';
-    });
+// ==================== WORD: CARGO DE ENTREGA (formato Excel) ====================
+async function generarCargoDeEntregaV2(usr, numeroTexto, fechaISO) {
+    const items = sesionEscaneo.items;
+    if (!items.length) { alert('No hay items.'); return; }
 
-    async function crearAsignacionDesdeEscaner(prod) {
-        const nueva = { codigo_producto: prod.codigo, dni_usuario: sesionEscaneo.usuario.dni, fecha: new Date().toISOString().slice(0, 10), encargado: sesion.nombre, estado: 'Activo', observaciones: '' };
-        const { data: fila, error } = await sb.from('asignaciones').insert(nueva).select().single();
-        if (error) { alert('Error al asignar: ' + error.message); return; }
-        data.asignaciones.push(asignacionDesdeFila(fila));
-        const hora = new Date().toLocaleTimeString('es-PE');
-        const tbody = document.getElementById('escaner-tabla-sesion');
-        tbody.innerHTML += `<tr><td>${prod.codigo}</td><td>${prod.descripcion}</td><td>${hora}</td></tr>`;
-        document.getElementById('escaner-estado').textContent = `✅ "${prod.descripcion}" entregado a ${sesionEscaneo.usuario.nombre}. Sigue escaneando...`;
-    }
+    const fechaTexto = fechaISO
+        ? new Date(fechaISO + 'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})
+        : new Date().toLocaleDateString('es-PE');
+    const logo = logoDataURL();
 
-    async function onCodigoEscaneado(textoDecodificado) {
-        const codigo = textoDecodificado.trim();
-        const ahora = Date.now();
-        if (codigo === ultimoCodigoEscaneado && (ahora - ultimoTiempoEscaneado) < 4000) return;
-        ultimoCodigoEscaneado = codigo; ultimoTiempoEscaneado = ahora;
+    let totalSoles = 0, totalDolares = 0;
+    const filas = items.map((it, i) => {
+        const p = obtenerProducto(it.codigo) || {};
+        const costo = Number(p.precioUnitario) || 0;
+        const esUSD = p.moneda === 'USD';
+        if (esUSD) totalDolares += costo; else totalSoles += costo;
+        return `<tr>
+            <td style="border:1px solid #000; padding:3px; text-align:center;">${i+1}</td>
+            <td style="border:1px solid #000; padding:3px;">${it.codigo}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.descripcion || it.descripcion || ''}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.marca || ''}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.modelo || ''}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.numeroSerie || it.numeroSerie || 'S/M'}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.imei || 'S/M'}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.condicion || ''}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.estadoFuncional || ''}</td>
+            <td style="border:1px solid #000; padding:3px;">${p.accesorios || 'SIN ACCESORIOS'}</td>
+            <td style="border:1px solid #000; padding:3px; text-align:right;">${esUSD?'$':'S/'} ${costo.toFixed(2)}</td>
+            <td style="border:1px solid #000; padding:3px;">${it.observacion || ''}</td>
+        </tr>`;
+    }).join('');
 
-        const estado = document.getElementById('escaner-estado');
-        let prod = data.productos.find(p => p.codigo.toLowerCase() === codigo.toLowerCase());
-        if (!prod) prod = data.productos.find(p => (p.numeroSerie || '').toLowerCase() === codigo.toLowerCase());
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset="utf-8"><title>Cargo de Entrega</title><style>
+        @page Sec1 { size: 297mm 210mm; margin: 8mm 10mm; }
+        div.Sec1 { page: Sec1; }
+        body { font-family: Calibri, Arial, sans-serif; font-size: 9pt; }
+        table.items { width:100%; border-collapse:collapse; font-size:7pt; table-layout:fixed; }
+        table.items td, table.items th { word-wrap:break-word; overflow-wrap:break-word; }
+        table.items th { background:#FFC107; color:#1E1E1E; border:1px solid #000; padding:3px; font-size:6.5pt; }
+        .legal { font-size:6.8pt; text-align:justify; line-height:1.35; margin-top:10px; }
+    </style></head>
+    <body><div class="Sec1">
 
-        if (prod) {
-            if (!productoDisponible(prod.codigo)) {
-                const asigActual = data.asignaciones.find(a => a.codigoProducto === prod.codigo && a.estado === 'Activo');
-                const otroUsr = data.usuarios.find(u => u.dni === asigActual?.dniUsuario);
-                if (!confirm(`"${prod.descripcion}" (${prod.codigo}) ya está asignado a ${otroUsr ? otroUsr.nombre : 'otra persona'}. ¿Reasignarlo a ${sesionEscaneo.usuario.nombre}?`)) {
-                    estado.textContent = 'Escaneo cancelado. Sigue escaneando otro ítem.';
-                    return;
-                }
-                await sb.from('asignaciones').update({ estado: 'Devuelto' }).eq('id', asigActual.id);
-                asigActual.estado = 'Devuelto';
-            }
-            await crearAsignacionDesdeEscaner(prod);
-        } else {
-            abrirModal('Producto no encontrado — Completar datos', `
-                <p style="color:#666; margin-bottom:0.8rem;">Código/serie escaneado: <strong>${codigo}</strong></p>
-                <div class="form-group"><label>Código de producto *</label><input type="text" id="qa-codigo" value="${codigo}"></div>
-                <div class="form-group"><label>Nº de Serie</label><input type="text" id="qa-serie" value="${codigo}"></div>
-                <div class="form-group"><label>Descripción *</label><input type="text" id="qa-descripcion"></div>
-                <div class="form-group"><label>Marca</label><input type="text" id="qa-marca"></div>
-                <div class="form-group"><label>Modelo</label><input type="text" id="qa-modelo"></div>
-            `, async () => {
-                const nuevoCodigo = obtenerValor('qa-codigo');
-                if (!nuevoCodigo) { alert('El código es obligatorio.'); return; }
-                if (data.productos.some(p => p.codigo === nuevoCodigo)) { alert('Ese código ya existe.'); return; }
-                const nuevoProd = { codigo: nuevoCodigo, categoria: '', descripcion: obtenerValor('qa-descripcion'), marca: obtenerValor('qa-marca'), modelo: obtenerValor('qa-modelo'), numeroSerie: obtenerValor('qa-serie'), imei: '', color: '', condicion: 'Usado', estadoFuncional: 'Operativo', accesorios: '', moneda: 'PEN', precioUnitario: 0 };
-                const { error } = await sb.from('productos').insert({
-                    codigo: nuevoProd.codigo, categoria: nuevoProd.categoria, descripcion: nuevoProd.descripcion, marca: nuevoProd.marca, modelo: nuevoProd.modelo,
-                    numero_serie: nuevoProd.numeroSerie, imei: nuevoProd.imei, color: nuevoProd.color, condicion: nuevoProd.condicion, estado_funcional: nuevoProd.estadoFuncional, accesorios: nuevoProd.accesorios,
-                    moneda: nuevoProd.moneda, precio_unitario: nuevoProd.precioUnitario
-                });
-                if (error) { alert('Error al guardar producto: ' + error.message); return; }
-                data.productos.push(nuevoProd);
-                await crearAsignacionDesdeEscaner(nuevoProd);
-            });
-        }
-    }
+        <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+            <tr>
+                <td style="width:60%; vertical-align:top; border:1px solid #000; padding:6px;">
+                    ${logo ? `<img src="${logo}" style="height:70px;"><br>` : ''}
+                    <strong style="font-size:20pt; color:#000;">TAK</strong>
+                    <strong style="font-size:16pt; color:#000;"> MINERÍA</strong><br>
+                    <span style="font-size:7.5pt; color:#555;">TAKIPUKARA MINERÍA &amp; CONSTRUCCIÓN S.A.C.</span>
+                </td>
+                <td style="width:40%; vertical-align:top; padding:0;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="border:1px solid #000; padding:3px; font-weight:bold; font-size:8pt; text-align:center;">FORMATO</td>
+                            <td style="border:1px solid #000; padding:3px; text-align:center; font-size:8pt;" colspan="2">CARGO - ENTREGA DE ACTIVOS EN PATRIMONIO</td>
+                        </tr>
+                        <tr><td style="border:1px solid #000; padding:2px; font-size:7pt;">Versión :</td><td style="border:1px solid #000; padding:2px; text-align:center; font-size:7pt;" colspan="2">Rv. 01</td></tr>
+                        <tr><td style="border:1px solid #000; padding:2px; font-size:7pt;">Emisión :</td><td style="border:1px solid #000; padding:2px; text-align:center; font-size:7pt;" colspan="2">${fechaTexto}</td></tr>
+                        <tr><td style="border:1px solid #000; padding:2px; font-size:7pt;">Revisión :</td><td style="border:1px solid #000; padding:2px; text-align:center; font-size:7pt;" colspan="2">LOG</td></tr>
+                        <tr><td style="border:1px solid #000; padding:2px; font-size:7pt;">Aprobado :</td><td style="border:1px solid #000; padding:2px; text-align:center; font-size:7pt;" colspan="2">GG</td></tr>
+                        <tr><td style="border:1px solid #000; padding:3px; font-weight:bold; font-size:8pt;">N°</td><td style="border:1px solid #000; padding:3px; text-align:center; font-weight:bold; font-size:9pt; background:#FBE4E4; color:#B00000;" colspan="2">${numeroTexto}</td></tr>
+                        <tr><td style="border:1px solid #000; padding:2px; font-size:7pt;">Código:</td><td style="border:1px solid #000; padding:2px; text-align:center; font-size:7pt;" colspan="2">LOG-CP-0001</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
 
-    // ---- Registrar mueble sin número de serie (código automático MOB-XXXX) ----
-    document.getElementById('btn-mueble-sin-serie').addEventListener('click', () => {
-        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
-        abrirModal('Registrar mueble sin número de serie', `
-            <div class="form-group"><label>Descripción *</label><input type="text" id="mob-descripcion" placeholder="Ej: Silla giratoria reposabrazos"></div>
-            <div class="form-group"><label>Marca / Color (opcional)</label><input type="text" id="mob-marca"></div>
-            <div class="form-group"><label>Condición</label><select id="mob-condicion"><option>Nuevo</option><option>Usado</option></select></div>
-        `, async () => {
-            const descripcion = obtenerValor('mob-descripcion');
-            if (!descripcion) { alert('La descripción es obligatoria.'); return; }
-            const n = await siguienteNumero('codigo_mobiliario');
-            if (n === null) { alert('No se pudo generar el código. Intenta de nuevo.'); return; }
-            const codigo = `MOB-${String(n).padStart(4, '0')}`;
-            const nuevoProd = { codigo, categoria: 'MOBILIARIO', descripcion, marca: obtenerValor('mob-marca'), modelo: '', numeroSerie: '', imei: '', color: '', condicion: obtenerValor('mob-condicion'), estadoFuncional: 'Operativo', accesorios: '', moneda: 'PEN', precioUnitario: 0 };
-            const { error } = await sb.from('productos').insert({
-                codigo: nuevoProd.codigo, categoria: nuevoProd.categoria, descripcion: nuevoProd.descripcion, marca: nuevoProd.marca, modelo: nuevoProd.modelo,
-                numero_serie: nuevoProd.numeroSerie, imei: nuevoProd.imei, color: nuevoProd.color, condicion: nuevoProd.condicion, estado_funcional: nuevoProd.estadoFuncional, accesorios: nuevoProd.accesorios,
-                moneda: nuevoProd.moneda, precio_unitario: nuevoProd.precioUnitario
-            });
-            if (error) { alert('Error al guardar: ' + error.message); return; }
-            data.productos.push(nuevoProd);
-            await crearAsignacionDesdeEscaner(nuevoProd);
-            setTimeout(() => mostrarQR(`QR Producto ${codigo}`, urlFichaProducto(codigo)), 300);
-        });
-    });
+        <table style="width:100%; border-collapse:collapse; margin-bottom:6px; font-size:9pt;">
+            <tr>
+                <td style="border:1px solid #000; padding:3px; width:20%; background:#FFF8E1; font-weight:bold;">APELLIDOS Y NOMBRES :</td>
+                <td style="border:1px solid #000; padding:3px; width:45%;">${(usr.nombre||'').toUpperCase()}</td>
+                <td style="border:1px solid #000; padding:3px; width:10%; background:#FFF8E1; font-weight:bold;">DNI :</td>
+                <td style="border:1px solid #000; padding:3px; width:25%;">${usr.dni||''}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #000; padding:3px; background:#FFF8E1; font-weight:bold;">CARGO :</td>
+                <td style="border:1px solid #000; padding:3px;">${usr.cargo||''}</td>
+                <td style="border:1px solid #000; padding:3px; background:#FFF8E1; font-weight:bold;">FECHA :</td>
+                <td style="border:1px solid #000; padding:3px;">${fechaTexto}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #000; padding:3px; background:#FFF8E1; font-weight:bold;">ÁREA :</td>
+                <td style="border:1px solid #000; padding:3px;">${usr.area||''}</td>
+                <td style="border:1px solid #000; padding:3px; background:#FFF8E1; font-weight:bold;">CeCo :</td>
+                <td style="border:1px solid #000; padding:3px;">${usr.ceco||''}</td>
+            </tr>
+        </table>
 
-    document.getElementById('btn-generar-cargo-escaner').addEventListener('click', () => {
-        if (!sesionEscaneo.usuario) { alert('Selecciona primero un colaborador.'); return; }
-        generarCargoPatrimonio(sesionEscaneo.usuario);
-    });
+        <table class="items">
+            <colgroup>
+                <col style="width:3%"><col style="width:9%"><col style="width:19%"><col style="width:7%">
+                <col style="width:9%"><col style="width:11%"><col style="width:7%"><col style="width:6%">
+                <col style="width:6%"><col style="width:12%"><col style="width:6%"><col style="width:5%">
+            </colgroup>
+            <tr>
+                <th>ITEM</th><th>CODIGO SKU</th><th>DESCRIPCION</th><th>MARCA</th><th>MODELO</th>
+                <th>Nro SERIE</th><th>IMEI</th><th>CONDICION</th><th>ESTADO FUNCIONAL</th>
+                <th>ACCESORIOS</th><th>COSTO DEL BIEN</th><th>OBSERVACION</th>
+            </tr>
+            ${filas}
+            <tr>
+                <td colspan="9" style="border:1px solid #000; padding:3px; text-align:right; font-weight:bold; background:#FFF8E1;">TOTAL</td>
+                <td style="border:1px solid #000; padding:3px; text-align:right; font-weight:bold;">S/ ${totalSoles.toFixed(2)}${totalDolares>0?`<br>$ ${totalDolares.toFixed(2)}`:''}</td>
+                <td colspan="2" style="border:1px solid #000; padding:3px;"></td>
+            </tr>
+        </table>
 
-    // ==================== DOCUMENTO FORMAL: CARGO DE BIENES ====================
-    async function generarCargoPatrimonio(usr) {
-        const equipos = data.asignaciones.filter(a => a.dniUsuario === usr.dni && a.estado === 'Activo')
-            .sort((a, b) => a.codigoProducto.localeCompare(b.codigoProducto));
-        if (equipos.length === 0) { alert('Este colaborador no tiene equipos activos asignados.'); return; }
+        <p class="legal">
+        Los activos patrimoniales entregados por TAKIPUKARA S.A.C. al colaborador son de uso exclusivo para el desempeño de sus funciones laborales, constituyendo una herramienta de trabajo indispensable para el cumplimiento de sus obligaciones.<br>
+        El receptor se compromete a utilizar los bienes con la diligencia debida, adoptando todas las medidas necesarias para garantizar su conservación y correcto funcionamiento.<br>
+        Es responsabilidad del trabajador custodiar los activos asignados durante el periodo de vigencia de su relación laboral.<br>
+        En caso de cese o retiro de la empresa, el colaborador deberá devolver la totalidad de los bienes en las mismas condiciones físicas y operativas en que fueron recibidos, salvo el desgaste natural derivado del uso ordinario y razonable, el cual no será objeto de reparación.<br>
+        Si se detectaran daños, pérdidas o deterioros atribuibles a una negligencia, mal uso o incumplimiento de las normas de seguridad, el trabajador asumirá la obligación de reponer el activo por otro de similares características o, en su defecto, abonar el monto establecido para su reparación o reposición, según el valor comercial o el costo de reposición vigente, previa conciliación con el área de Logística o Administración.<br>
+        Queda expresamente excluido de esta responsabilidad el desgaste progresivo y normal ocasionado por el tiempo de uso y la antigüedad del bien, siempre que no medie imprudencia o uso indebido.
+        </p>
 
-        const numero = await siguienteNumero('cargo_patrimonio');
-        const numeroTexto = numero !== null ? String(numero) : '----';
-        const fechaTexto = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const logo = logoDataURL();
+        <table style="width:100%; margin-top:50px;">
+            <tr>
+                <td style="width:50%; text-align:center; font-size:9pt;">
+                    <br><br>_______________________________<br>
+                    <b>RECEPTOR</b><br>
+                    ${usr.nombre}<br>
+                    DNI: ${usr.dni}
+                </td>
+                <td style="width:50%; text-align:center; font-size:9pt;">
+                    <br><br>_______________________________<br>
+                    <b>LOGÍSTICA</b><br>
+                    ${sesion ? sesion.nombre : ''}
+                </td>
+            </tr>
+        </table>
+    </div></body></html>`;
 
-        // Anchos de columna tomados directamente del Excel real "FORMATO DE ENTREGA"
-        // (proporciones de: A, B+C+D, E, F, G+H, I, J, K, L, M, N+O)
-        const anchosCol = [4.5, 22.4, 6.6, 5.6, 10.2, 3.6, 4.7, 5.9, 18.0, 5.9, 12.4];
-        const colgroup = `<colgroup>${anchosCol.map(w => `<col style="width:${w}%;">`).join('')}</colgroup>`;
-
-        let totalSoles = 0, totalDolares = 0;
-        const filas = equipos.map(a => {
-            const prod = obtenerProducto(a.codigoProducto);
-            const costo = prod ? (Number(prod.precioUnitario) || 0) : 0;
-            const esUSD = prod && prod.moneda === 'USD';
-            if (esUSD) totalDolares += costo; else totalSoles += costo;
-            return `<tr>
-                <td style="border:1px solid #000; padding:3px;">${prod?.codigo || a.codigoProducto}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.descripcion || ''}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.marca || ''}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.modelo || ''}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.numeroSerie || 'S/M'}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.imei || 'S/M'}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.condicion || ''}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.estadoFuncional || ''}</td>
-                <td style="border:1px solid #000; padding:3px;">${prod?.accesorios || 'SIN ACCESORIOS'}</td>
-                <td style="border:1px solid #000; padding:3px; text-align:right;">${esUSD ? '$' : 'S/'} ${costo.toFixed(2)}</td>
-                <td style="border:1px solid #000; padding:3px;">${a.observaciones || ''}</td>
-            </tr>`;
-        }).join('');
-
-        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset="utf-8"><title>Cargo de Bienes</title><style>
-            @page Sec1 { size: 297mm 210mm; margin: 10mm; }
-            div.Sec1 { page: Sec1; }
-            body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; }
-            table.tabla-items { width:100%; border-collapse:collapse; font-size:8pt; table-layout:fixed; }
-            table.tabla-items td { word-wrap:break-word; overflow-wrap:break-word; }
-            table.tabla-items th { background:#FFC107; color:#1E1E1E; border:1px solid #000; padding:3px; font-size:7.5pt; }
-        </style></head>
-        <body><div class="Sec1">
-            <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
-                <tr>
-                    <td style="width:16%; text-align:center; vertical-align:middle; border:1px solid #000; padding:6px;">
-                        ${logo ? `<img src="${logo}" style="height:45px;"><br>` : ''}
-                        <strong>TAKIPUKARA</strong><br><span style="font-size:7pt;">MINERÍA &amp; CONSTRUCCIÓN</span>
-                    </td>
-                    <td style="width:64%; text-align:center; vertical-align:middle; font-size:15pt; font-weight:bold; border:1px solid #000;">
-                        CARGO - ENTREGA DE ACTIVOS EN PATRIMONIO
-                    </td>
-                    <td style="width:20%; vertical-align:top; font-size:7.5pt; padding:0;">
-                        <table style="width:100%; border-collapse:collapse; height:100%;">
-                            <tr><td style="border:1px solid #000; padding:2px; text-align:center; font-weight:bold;" colspan="2">FORMATO</td><td style="border:1px solid #000; padding:2px; text-align:center;">${'LOG-CP-0001'}</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Versión :</td><td style="border:1px solid #000; padding:2px;">Rv. 01</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Emisión :</td><td style="border:1px solid #000; padding:2px;">25/09/2026</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Revisión :</td><td style="border:1px solid #000; padding:2px;">LOG</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px;" colspan="2">Aprobado :</td><td style="border:1px solid #000; padding:2px;">GG</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px; background:#FBE4E4; color:#B00000; font-weight:bold; text-align:center;">N°</td><td style="border:1px solid #000; padding:2px; background:#FBE4E4; color:#B00000; font-weight:bold; text-align:center;" colspan="2">${numeroTexto}</td></tr>
-                            <tr><td style="border:1px solid #000; padding:2px; text-align:center; font-weight:bold;" colspan="2">FECHA</td><td style="border:1px solid #000; padding:2px; text-align:center;">${fechaTexto}</td></tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-
-            <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:9.5pt;">
-                <tr><td style="border:1px solid #000; padding:3px; width:22%;">APELLIDOS Y NOMBRES&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.nombre.toUpperCase()}</td></tr>
-                <tr><td style="border:1px solid #000; padding:3px;">DNI&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.dni}</td></tr>
-                <tr><td style="border:1px solid #000; padding:3px;">CARGO&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.cargo}</td></tr>
-                <tr><td style="border:1px solid #000; padding:3px;">ÁREA&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.area}</td></tr>
-                <tr><td style="border:1px solid #000; padding:3px;">CeCo&nbsp;&nbsp;&nbsp;&nbsp;:</td><td style="border:1px solid #000; padding:3px;">${usr.ceco || ''}</td></tr>
-            </table>
-
-            <table class="tabla-items">
-                ${colgroup}
-                <tr>
-                    <th>CODIGO SKU</th><th>DESCRIPCION</th><th>MARCA</th><th>MODELO</th><th>Nro SERIE</th><th>IMEI</th>
-                    <th>CONDICION</th><th>ESTADO FUNCIONAL</th><th>ACCESORIOS</th><th>COSTO DEL BIEN</th><th>OBSERVACION</th>
-                </tr>
-                ${filas}
-            </table>
-            <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
-                ${colgroup}
-                <tr>
-                    <td colspan="8" style="border:1px solid #000; padding:3px;"></td>
-                    <td style="border:1px solid #000; padding:3px; font-weight:bold;">TOTAL</td>
-                    <td style="border:1px solid #000; padding:3px; text-align:right; font-weight:bold;">S/ ${totalSoles.toFixed(2)}${totalDolares > 0 ? `<br>$ ${totalDolares.toFixed(2)}` : ''}</td>
-                    <td style="border:1px solid #000; padding:3px;"></td>
-                </tr>
-            </table>
-
-            <p style="font-size:8.5pt; text-align:justify; margin-top:14px; line-height:1.4;">
-                Los activos patrimoniales entregados por TAKIPUKARA S.A.C. al colaborador son de uso exclusivo para el desempeño de sus funciones laborales, constituyendo una herramienta de trabajo indispensable para el cumplimiento de sus obligaciones.<br>
-                El receptor se compromete a utilizar los bienes con la diligencia debida, adoptando todas las medidas necesarias para garantizar su conservación y correcto funcionamiento.<br>
-                Es responsabilidad del trabajador custodiar los activos asignados durante el periodo de vigencia de su relación laboral.<br>
-                En caso de cese o retiro de la empresa, el colaborador deberá devolver la totalidad de los bienes en las mismas condiciones físicas y operativas en que fueron recibidos, salvo el desgaste natural derivado del uso ordinario y razonable, el cual no será objeto de reparación.<br>
-                Si se detectaran daños, pérdidas o deterioros atribuibles a una negligencia, mal uso o incumplimiento de las normas de seguridad, el trabajador asumirá la obligación de reponer el activo por otro de similares características o, en su defecto, abonar el monto establecido para su reparación o reposición, según el valor comercial o el costo de reposición vigente, previa conciliación con el área de Logística o Administración.<br>
-                Queda expresamente excluido de esta responsabilidad el desgaste progresivo y normal ocasionado por el tiempo de uso y la antigüedad del bien, siempre que no medie imprudencia o uso indebido.
-            </p>
-
-            <table style="width:100%; margin-top:50px;">
-                <tr>
-                    <td style="width:50%; text-align:center;">RECEPTOR:&nbsp;&nbsp;_______________________________<br>${usr.nombre}<br>DNI: ${usr.dni}</td>
-                    <td style="width:50%; text-align:center;">LOGISTICA:&nbsp;&nbsp;_______________________________<br>${sesion ? sesion.nombre : ''}</td>
-                </tr>
-            </table>
-        </div></body></html>`;
-
-        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Cargo_Patrimonio_${numeroTexto}_${usr.nombre.replace(/[^a-zA-Z0-9]+/g, '_')}.doc`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Cargo_${numeroTexto}_${(usr.nombre||'').replace(/[^a-zA-Z0-9]+/g,'_')}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
 </script>
 </body>
 </html>
